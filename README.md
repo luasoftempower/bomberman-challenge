@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Blast Room
 
 A server-authoritative, real-time Bomberman-style game for up to four people. Create a room, share its link, and start a match; empty or disconnected seats are controlled by bots.
@@ -21,3 +22,6 @@ pnpm build
 ```
 
 The project includes a multi-stage Dockerfile and a Render Blueprint. Set `PUBLIC_ORIGIN` to the final HTTPS origin so social share cards use an absolute image URL.
+=======
+# bomberman-challenge
+>>>>>>> d6510d62696bd83918db44147dc993f893971729
