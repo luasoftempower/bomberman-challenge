@@ -3,11 +3,9 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
-# Define a permissão do esbuild no formato aceito pelo pnpm v11
-RUN echo "only-built-dependencies[]=esbuild" > .npmrc && \
-    echo "only-built-dependencies[]=@esbuild/*" >> .npmrc
-
-RUN corepack enable && pnpm install --no-frozen-lockfile
+RUN corepack enable && \
+    pnpm install --no-frozen-lockfile --ignore-scripts && \
+    pnpm rebuild esbuild
 
 COPY . .
 RUN pnpm build
@@ -19,10 +17,8 @@ ENV PORT=3000
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN echo "only-built-dependencies[]=esbuild" > .npmrc && \
-    echo "only-built-dependencies[]=@esbuild/*" >> .npmrc
-
-RUN corepack enable && pnpm install --prod --no-frozen-lockfile
+RUN corepack enable && \
+    pnpm install --prod --no-frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
