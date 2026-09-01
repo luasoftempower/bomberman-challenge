@@ -3,12 +3,15 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
+# Instala tudo ignorando scripts e reconstrói o esbuild manualmente
 RUN corepack enable && \
     pnpm install --no-frozen-lockfile --ignore-scripts && \
     pnpm rebuild esbuild
 
 COPY . .
-RUN pnpm build
+
+# Usa o npm nativo para rodar o build, contornando o bloqueio do pnpm
+RUN npm run build
 
 FROM node:22-alpine
 WORKDIR /app
