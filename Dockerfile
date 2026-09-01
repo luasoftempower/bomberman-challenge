@@ -1,7 +1,10 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
+COPY package.json pnpm-lock.yaml ./
+RUN echo "onlyBuiltDependencies:" > pnpm-workspace.yaml && \
+    echo "  - esbuild" >> pnpm-workspace.yaml
+
 RUN corepack enable && pnpm install --no-frozen-lockfile
 
 COPY . .
@@ -12,7 +15,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
+COPY package.json pnpm-lock.yaml ./
+RUN echo "onlyBuiltDependencies:" > pnpm-workspace.yaml && \
+    echo "  - esbuild" >> pnpm-workspace.yaml
+
 RUN corepack enable && pnpm install --prod --no-frozen-lockfile
 
 COPY --from=build /app/dist ./dist
