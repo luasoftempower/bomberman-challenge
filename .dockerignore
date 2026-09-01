@@ -1,0 +1,6 @@
+node_modules
+dist
+.git
+test
+npm-debug.log
+
