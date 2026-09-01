@@ -27,13 +27,27 @@ test("starting with two humans creates exactly two bots", () => {
   assert.equal(room.state.players.length, 4);
 });
 
+test("only the lone host can choose the bot difficulty", () => {
+  const room = new Room("ABC234", "host-secret");
+  const hostSocket = new FakeSocket();
+  const host = room.addHuman(hostSocket, { name: "Host", hostToken: "host-secret" });
+
+  room.setBotDifficulty(host.id, "hard");
+  assert.equal(room.botDifficulty, "hard");
+  assert.equal(hostSocket.messages.at(-1).botDifficulty, "hard");
+
+  const guest = room.addHuman(new FakeSocket(), { name: "Friend" });
+  room.setBotDifficulty(host.id, "easy");
+  room.setBotDifficulty(guest.id, "normal");
+  assert.equal(room.botDifficulty, "hard");
+});
 test("the simulation waits for the animated match countdown", () => {
   const room = new Room("ABC234", "host-secret");
   const socket = new FakeSocket();
   const host = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
   room.start(host.id);
   const matchStart = socket.messages.find((message) => message.type === "matchStart");
-  assert.equal(matchStart.countdownMs, 2400);
+  assert.equal(matchStart.countdownMs, 4420);
   room.tick(room.startsAt - 1);
   assert.equal(room.state.tick, 0);
   room.tick(room.startsAt);
@@ -49,6 +63,21 @@ test("returning from the result announces the lobby transition first", () => {
   room.rematch(host.id);
   assert.deepEqual(socket.messages.slice(-2).map((message) => message.type), ["lobbyReturn", "lobby"]);
   assert.equal(socket.messages.at(-2).transitionMs, 1320);
+});
+
+test("the winner earns one persistent trophy across a rematch", () => {
+  const room = new Room("ABC234", "host-secret");
+  const socket = new FakeSocket();
+  const host = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
+  room.start(host.id);
+  room.state.status = "ended";
+  room.state.winnerSlot = room.state.players.find((candidate) => candidate.id === host.id).slot;
+  room.tick(room.startsAt);
+  const result = socket.messages.find((message) => message.type === "matchEnd");
+  assert.equal(result.standings.find((entry) => entry.id === host.id).trophies, 1);
+  room.rematch(host.id);
+  const lobby = socket.messages.at(-1);
+  assert.equal(lobby.slots.find((entry) => entry.id === host.id).trophies, 1);
 });
 
 test("a disconnected human becomes a bot during play", () => {

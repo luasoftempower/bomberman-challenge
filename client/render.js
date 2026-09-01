@@ -289,6 +289,54 @@ function drawVictoryMascot(context, palette, elapsed) {
   px(context, "#ffffff", x + 3, y - 11, 2, 1);
 }
 
+function drawCryingMascot(context, palette, elapsed) {
+  const x = 56;
+  const sob = Math.floor(elapsed * 7) % 2 ? 1 : -1;
+  const y = 69 + Math.round(Math.abs(Math.sin(elapsed * 5.4)) * 2);
+  const helmetShadow = shade(palette.helmet, -42);
+  const suitShadow = shade(palette.suit, -58);
+  const tearFall = Math.round((elapsed * 24) % 24);
+
+  px(context, "rgba(0,0,0,.3)", x - 18, 89, 36, 5);
+  px(context, "#080b14", x - 10, y + 9, 9, 13);
+  px(context, "#080b14", x + 1, y + 9, 9, 13);
+  px(context, palette.boots, x - 9 - sob, y + 14, 8, 7);
+  px(context, palette.boots, x + 1 + sob, y + 14, 8, 7);
+  px(context, "#080b14", x - 10, y - 1, 20, 15);
+  px(context, suitShadow, x - 8, y, 16, 12);
+  px(context, palette.suit, x - 6, y, 12, 9);
+  px(context, "#24263b", x - 8, y + 8, 16, 3);
+  px(context, palette.accent, x - 2, y + 8, 4, 3);
+
+  px(context, suitShadow, x - 15, y - 1 + sob, 7, 11);
+  px(context, suitShadow, x + 8, y - 1 - sob, 7, 11);
+  px(context, "#080b14", x - 18, y - 8 + sob, 9, 9);
+  px(context, palette.gloves, x - 17, y - 7 + sob, 7, 7);
+  px(context, "#080b14", x + 9, y - 8 - sob, 9, 9);
+  px(context, palette.gloves, x + 10, y - 7 - sob, 7, 7);
+
+  px(context, "#070a12", x - 15, y - 18, 30, 20);
+  px(context, "#070a12", x - 11, y - 23, 22, 27);
+  px(context, helmetShadow, x - 13, y - 17, 26, 17);
+  px(context, palette.helmet, x - 9, y - 21, 18, 22);
+  px(context, palette.helmet, x - 12, y - 16, 24, 14);
+  px(context, shade(palette.helmet, 40), x - 8, y - 20, 8, 4);
+  px(context, "#080b14", x - 2, y - 27, 4, 6);
+  px(context, "#080b14", x - 5, y - 32, 10, 7);
+  px(context, palette.accent, x - 4, y - 31, 8, 5);
+  px(context, "#080b14", x - 10, y - 14, 20, 13);
+  px(context, "#f0bf91", x - 8, y - 13, 16, 10);
+  px(context, "#ffd9ae", x - 6, y - 13, 12, 6);
+  px(context, "#151927", x - 6, y - 10, 4, 2);
+  px(context, "#151927", x + 2, y - 10, 4, 2);
+  px(context, "#151927", x - 3, y - 4, 2, 2);
+  px(context, "#151927", x - 1, y - 5, 2, 2);
+  px(context, "#151927", x + 1, y - 4, 2, 2);
+  px(context, "#55dff7", x - 7, y - 8 + tearFall, 3, 6);
+  px(context, "#2588ce", x - 7, y - 3 + tearFall, 3, 3);
+  px(context, "#55dff7", x + 4, y - 8 + ((tearFall + 10) % 24), 3, 6);
+  px(context, "#2588ce", x + 4, y - 3 + ((tearFall + 10) % 24), 3, 3);
+}
 function drawJugglingBomb(context, x, y, sparkFrame) {
   px(context, "rgba(0,0,0,.2)", x - 6, y + 6, 13, 3);
   px(context, "#070a12", x - 6, y - 6, 12, 14);
@@ -389,6 +437,22 @@ export function startMenuMascotAnimation(canvas) {
   return () => cancelAnimationFrame(animationFrameId);
 }
 
+export function startResultCharacterAnimation(canvas, slot = 0, mood = "crying") {
+  const context = canvas?.getContext("2d", { alpha: true, desynchronized: true });
+  if (!context) return () => {};
+  const palette = CHARACTER_PALETTES[slot] || CHARACTER_PALETTES[0];
+  const startedAt = performance.now();
+  let animationFrameId;
+  const frame = (now) => {
+    context.imageSmoothingEnabled = false;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (mood === "winner") drawVictoryMascot(context, palette, (now - startedAt) / 1000);
+    else drawCryingMascot(context, palette, (now - startedAt) / 1000);
+    animationFrameId = requestAnimationFrame(frame);
+  };
+  animationFrameId = requestAnimationFrame(frame);
+  return () => cancelAnimationFrame(animationFrameId);
+}
 export function startVictoryAnimation(canvas, slot = 0) {
   const context = canvas?.getContext("2d", { alpha: true, desynchronized: true });
   if (!context) return () => {};
