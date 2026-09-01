@@ -1,8 +1,12 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
-RUN echo "onlyBuiltDependencies:" > pnpm-workspace.yaml && \
+# Copia os manifestos e arquivos de configuração
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* .npmrc* ./
+
+# Configura a permissão do esbuild no .npmrc e no pnpm-workspace.yaml
+RUN echo "only-built-dependencies=esbuild" >> .npmrc && \
+    echo "onlyBuiltDependencies:" > pnpm-workspace.yaml && \
     echo "  - esbuild" >> pnpm-workspace.yaml
 
 RUN corepack enable && pnpm install --no-frozen-lockfile
@@ -15,8 +19,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY package.json pnpm-lock.yaml ./
-RUN echo "onlyBuiltDependencies:" > pnpm-workspace.yaml && \
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* .npmrc* ./
+
+RUN echo "only-built-dependencies=esbuild" >> .npmrc && \
+    echo "onlyBuiltDependencies:" > pnpm-workspace.yaml && \
     echo "  - esbuild" >> pnpm-workspace.yaml
 
 RUN corepack enable && pnpm install --prod --no-frozen-lockfile
