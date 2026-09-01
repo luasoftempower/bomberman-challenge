@@ -27,6 +27,7 @@ test("starting with two humans creates exactly two bots", () => {
   assert.equal(room.state.players.length, 4);
 });
 
+<<<<<<< HEAD
 test("only the lone host can choose the bot difficulty", () => {
   const room = new Room("ABC234", "host-secret");
   const hostSocket = new FakeSocket();
@@ -41,13 +42,19 @@ test("only the lone host can choose the bot difficulty", () => {
   room.setBotDifficulty(guest.id, "normal");
   assert.equal(room.botDifficulty, "hard");
 });
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
 test("the simulation waits for the animated match countdown", () => {
   const room = new Room("ABC234", "host-secret");
   const socket = new FakeSocket();
   const host = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
   room.start(host.id);
   const matchStart = socket.messages.find((message) => message.type === "matchStart");
+<<<<<<< HEAD
   assert.equal(matchStart.countdownMs, 4420);
+=======
+  assert.equal(matchStart.countdownMs, 2400);
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
   room.tick(room.startsAt - 1);
   assert.equal(room.state.tick, 0);
   room.tick(room.startsAt);
@@ -65,6 +72,7 @@ test("returning from the result announces the lobby transition first", () => {
   assert.equal(socket.messages.at(-2).transitionMs, 1320);
 });
 
+<<<<<<< HEAD
 test("the winner earns one persistent trophy across a rematch", () => {
   const room = new Room("ABC234", "host-secret");
   const socket = new FakeSocket();
@@ -80,6 +88,8 @@ test("the winner earns one persistent trophy across a rematch", () => {
   assert.equal(lobby.slots.find((entry) => entry.id === host.id).trophies, 1);
 });
 
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
 test("a disconnected human becomes a bot during play", () => {
   const room = new Room("ABC234", "host-secret");
   const host = room.addHuman(new FakeSocket(), { name: "Host", hostToken: "host-secret" });

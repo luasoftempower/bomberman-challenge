@@ -289,6 +289,7 @@ function drawVictoryMascot(context, palette, elapsed) {
   px(context, "#ffffff", x + 3, y - 11, 2, 1);
 }
 
+<<<<<<< HEAD
 function drawCryingMascot(context, palette, elapsed) {
   const x = 56;
   const sob = Math.floor(elapsed * 7) % 2 ? 1 : -1;
@@ -337,6 +338,8 @@ function drawCryingMascot(context, palette, elapsed) {
   px(context, "#55dff7", x + 4, y - 8 + ((tearFall + 10) % 24), 3, 6);
   px(context, "#2588ce", x + 4, y - 3 + ((tearFall + 10) % 24), 3, 3);
 }
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
 function drawJugglingBomb(context, x, y, sparkFrame) {
   px(context, "rgba(0,0,0,.2)", x - 6, y + 6, 13, 3);
   px(context, "#070a12", x - 6, y - 6, 12, 14);
@@ -437,6 +440,7 @@ export function startMenuMascotAnimation(canvas) {
   return () => cancelAnimationFrame(animationFrameId);
 }
 
+<<<<<<< HEAD
 export function startResultCharacterAnimation(canvas, slot = 0, mood = "crying") {
   const context = canvas?.getContext("2d", { alpha: true, desynchronized: true });
   if (!context) return () => {};
@@ -453,6 +457,8 @@ export function startResultCharacterAnimation(canvas, slot = 0, mood = "crying")
   animationFrameId = requestAnimationFrame(frame);
   return () => cancelAnimationFrame(animationFrameId);
 }
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
 export function startVictoryAnimation(canvas, slot = 0) {
   const context = canvas?.getContext("2d", { alpha: true, desynchronized: true });
   if (!context) return () => {};

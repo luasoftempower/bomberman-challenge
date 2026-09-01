@@ -28,4 +28,8 @@ COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
 
 EXPOSE 3000
+<<<<<<< HEAD
 CMD ["node", "server/index.js"]
+=======
+CMD ["node", "server/index.js"]
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a

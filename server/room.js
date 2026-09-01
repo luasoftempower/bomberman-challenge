@@ -4,6 +4,7 @@ import { ROOM_CAPACITY, TICK_RATE } from "../shared/constants.js";
 import { createMatch, snapshot, step } from "../shared/sim.js";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+<<<<<<< HEAD
 const MATCH_COUNTDOWN_MS = 4420;
 const BOT_DIFFICULTIES = new Set(["easy", "normal", "hard"]);
 const BOT_PROFILES = {
@@ -11,6 +12,9 @@ const BOT_PROFILES = {
   normal: { minDelay: 90, maxDelay: 180, urgentDelay: 1000 / TICK_RATE },
   hard: { minDelay: 45, maxDelay: 85, urgentDelay: 1000 / TICK_RATE },
 };
+=======
+const MATCH_COUNTDOWN_MS = 2400;
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
 
 export function makeCode() {
   const bytes = randomBytes(6);
@@ -33,8 +37,11 @@ export class Room {
     this.state = null;
     this.startsAt = 0;
     this.endAnnounced = false;
+<<<<<<< HEAD
     this.trophies = new Map();
     this.botDifficulty = "normal";
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
     this.emptySince = null;
   }
 
@@ -53,7 +60,10 @@ export class Room {
     if (!this.hostId || hostToken === this.hostToken) this.hostId = id;
     this.emptySince = null;
     this.inputs[id] = { dx: 0, dy: 0, drop: false };
+<<<<<<< HEAD
     this.trophies.set(id, 0);
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
     send(socket, { type: "joined", playerId: id, slot: open.slot, roomCode: this.code, isHost: id === this.hostId });
     this.broadcastLobby();
     return { id };
@@ -67,6 +77,7 @@ export class Room {
     return {
       type: "lobby",
       hostId: this.hostId,
+<<<<<<< HEAD
       botDifficulty: this.botDifficulty,
       slots: this.slots.map(({ slot, id, name, ready, kind }) => ({ slot, id, name, ready: Boolean(ready), kind, trophies: this.trophies.get(id) || 0 })),
     };
@@ -78,6 +89,12 @@ export class Room {
       .map(({ slot, id, name, kind }) => ({ slot, id, name, kind, trophies: this.trophies.get(id) || 0 }));
   }
 
+=======
+      slots: this.slots.map(({ slot, id, name, ready, kind }) => ({ slot, id, name, ready: Boolean(ready), kind })),
+    };
+  }
+
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
   broadcastLobby() {
     this.broadcast(this.lobbyPayload());
   }
@@ -89,6 +106,7 @@ export class Room {
     this.broadcastLobby();
   }
 
+<<<<<<< HEAD
   setBotDifficulty(playerId, difficulty) {
     if (playerId !== this.hostId || this.phase !== "lobby" || this.humanCount() !== 1) return;
     if (!BOT_DIFFICULTIES.has(difficulty)) return;
@@ -96,6 +114,8 @@ export class Room {
     this.broadcastLobby();
   }
 
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
   updateInput(playerId, input) {
     if (!this.inputs[playerId]) return;
     this.inputs[playerId] = {
@@ -109,7 +129,10 @@ export class Room {
     if (playerId !== this.hostId || this.phase !== "lobby") return;
     for (const slot of this.slots) {
       if (slot.kind === "empty") Object.assign(slot, { id: `bot-${this.code}-${slot.slot}`, name: `BOT ${slot.slot + 1}`, kind: "bot", ready: true });
+<<<<<<< HEAD
       if (!this.trophies.has(slot.id)) this.trophies.set(slot.id, 0);
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
     }
     const seed = randomBytes(4).readUInt32LE(0);
     this.state = createMatch(seed, this.slots.map(({ id, slot, name, kind }) => ({ id, slot, name, kind })));
@@ -118,7 +141,10 @@ export class Room {
     this.phase = "playing";
     this.startsAt = Date.now() + MATCH_COUNTDOWN_MS;
     this.endAnnounced = false;
+<<<<<<< HEAD
 
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
     this.broadcast({ type: "matchStart", seed, grid: this.state.grid, players: this.state.players, countdownMs: MATCH_COUNTDOWN_MS });
   }
 
@@ -148,10 +174,15 @@ export class Room {
       const reachedTileCenter = !botPlayer?.moveTarget;
       if (!currentPlan || (reachedTileCenter && now >= currentPlan.nextAt)) {
         const decision = decideBotInput(this.state, slot.id, reservedBotDestinations);
+<<<<<<< HEAD
         const profile = BOT_PROFILES[this.botDifficulty] || BOT_PROFILES.normal;
         const canDrop = this.botDifficulty !== "easy" || (this.state.tick + slot.slot) % 3 === 0;
         this.inputs[slot.id] = decision.input.drop && !canDrop ? { ...decision.input, drop: false } : decision.input;
         const delay = decision.urgent ? profile.urgentDelay : profile.minDelay + Math.random() * (profile.maxDelay - profile.minDelay);
+=======
+        this.inputs[slot.id] = decision.input;
+        const delay = decision.urgent ? 1000 / TICK_RATE : 90 + Math.random() * 90;
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
         this.botPlans[slot.id] = { path: decision.path, nextAt: now + delay };
       }
       const nextTile = this.botPlans[slot.id]?.path?.[0];
@@ -163,9 +194,13 @@ export class Room {
     if (this.state.status === "ended" && !this.endAnnounced) {
       this.phase = "ended";
       this.endAnnounced = true;
+<<<<<<< HEAD
       const winner = this.state.players.find((player) => player.slot === this.state.winnerSlot);
       if (winner) this.trophies.set(winner.id, (this.trophies.get(winner.id) || 0) + 1);
       this.broadcast({ type: "matchEnd", winnerSlot: this.state.winnerSlot, standings: this.standingsPayload() });
+=======
+      this.broadcast({ type: "matchEnd", winnerSlot: this.state.winnerSlot });
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
     }
   }
 

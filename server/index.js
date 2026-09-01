@@ -83,7 +83,10 @@ webSockets.on("connection", (socket) => {
 
     if (message.type === "input") room.updateInput(playerId, message);
     else if (message.type === "ready") room.setReady(playerId, message.ready);
+<<<<<<< HEAD
     else if (message.type === "botDifficulty") room.setBotDifficulty(playerId, message.difficulty);
+=======
+>>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a
     else if (message.type === "start") room.start(playerId);
     else if (message.type === "rematch") room.rematch(playerId);
   });
