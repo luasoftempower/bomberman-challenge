@@ -1,35 +1,29 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Instala tudo ignorando scripts e reconstrói o esbuild manualmente
+# Instala as dependências aprovadas e gera o cliente de produção.
 RUN corepack enable && \
-    pnpm install --no-frozen-lockfile --ignore-scripts && \
-    pnpm rebuild esbuild
+    pnpm install --frozen-lockfile
 
 COPY . .
 
-# Usa o npm nativo para rodar o build, contornando o bloqueio do pnpm
-RUN npm run build
+RUN pnpm build
 
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 RUN corepack enable && \
-    pnpm install --prod --no-frozen-lockfile --ignore-scripts
+    pnpm install --prod --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
 
 EXPOSE 3000
-<<<<<<< HEAD
 CMD ["node", "server/index.js"]
-=======
-CMD ["node", "server/index.js"]
->>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a

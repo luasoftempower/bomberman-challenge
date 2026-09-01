@@ -7,8 +7,16 @@ export function createInputController(send, onInput = () => {}) {
     ArrowUp: "up", w: "up", W: "up",
     ArrowDown: "down", s: "down", S: "down",
     " ": "drop",
+    e: "detonate", E: "detonate",
+    q: "special", Q: "special",
   };
-  const value = () => ({ dx: Number(held.has("right")) - Number(held.has("left")), dy: Number(held.has("down")) - Number(held.has("up")), drop: held.has("drop") });
+  const value = () => ({
+    dx: Number(held.has("right")) - Number(held.has("left")),
+    dy: Number(held.has("down")) - Number(held.has("up")),
+    drop: held.has("drop"),
+    detonate: held.has("detonate"),
+    special: held.has("special"),
+  });
   function emit(force = false) {
     const input = value();
     const serialized = JSON.stringify(input);

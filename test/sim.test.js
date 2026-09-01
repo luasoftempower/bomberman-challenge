@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { dangerDeadlines, decideBotInput, hasEscapeRoute } from "../shared/bots.js";
-import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, TILE_SIZE, WALL } from "../shared/constants.js";
-import { createGrid, createMatch, forceDetonate, indexOf, snapshot, step } from "../shared/sim.js";
+import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MAX_FIRE_RANGE, MOVE_SPEED, SPEED_UP_AMOUNT, TILE_SIZE, WALL } from "../shared/constants.js";
+import { createGrid, createMatch, dropDeathBlock, forceDetonate, indexOf, snapshot, step } from "../shared/sim.js";
 
 function openGrid() {
   const grid = Array(BOARD_WIDTH * BOARD_HEIGHT).fill(EMPTY);
@@ -68,8 +68,12 @@ test("a player walks off their bomb but cannot walk back onto it", () => {
   player.y = 3.5 * TILE_SIZE;
   step(state, { p1: { dx: 0, dy: 0, drop: true } });
   assert.equal(state.bombs.length, 1);
-  for (let count = 0; count < 16; count += 1) step(state, { p1: { dx: 1, dy: 0, drop: false } });
-  step(state, { p1: { dx: 0, dy: 0, drop: false } });
+  let movementTicks = 0;
+  do {
+    step(state, { p1: { dx: 1, dy: 0, drop: false } });
+    movementTicks += 1;
+    assert(movementTicks < 100, "player should reach the adjacent tile");
+  } while (player.moveTarget);
   const escapedX = player.x;
   assert.equal(state.bombs[0].passThroughIds.includes("p1"), false);
   for (let count = 0; count < 5; count += 1) step(state, { p1: { dx: -1, dy: 0, drop: false } });
@@ -295,4 +299,120 @@ test("a lone bot clears random arenas without killing itself", () => {
     assert.equal(placedBomb, true, `bot should use bombs on seed ${seed}`);
     assert.equal(state.players[0].alive, true, `bot should survive its own bombs on seed ${seed}`);
   }
+});
+
+test("only Super Bomberlan reveals powerups from destroyed crates", () => {
+  for (const mode of [GAME_MODES.CLASSIC, GAME_MODES.SUPER]) {
+    const state = baseState();
+    state.mode = mode;
+    state.random = () => 0;
+    const grid = state.grid.split("");
+    grid[indexOf(3, 3)] = CRATE;
+    state.grid = grid.join("");
+    state.bombs = [bomb(1, 2, 3)];
+    forceDetonate(state, [1]);
+    assert.equal(state.powerups.length, mode === GAME_MODES.SUPER ? 1 : 0);
+  }
+});
+
+test("the ten Super Bomberlan powerups apply their stats and abilities", () => {
+  const state = baseState();
+  state.mode = GAME_MODES.SUPER;
+  const player = state.players[0];
+  const x = Math.floor(player.x / TILE_SIZE);
+  const y = Math.floor(player.y / TILE_SIZE);
+  const types = ["fire", "bomb", "speed", "remote", "glove", "kick", "bombPass", "blockPass", "suit", "fullFire"];
+  state.powerups = types.map((type, index) => ({ id: index + 1, type, x, y }));
+
+  step(state, {});
+
+  assert.equal(player.fireRange, MAX_FIRE_RANGE);
+  assert.equal(player.maxBombs, 3);
+  assert.equal(player.moveSpeed, MOVE_SPEED + SPEED_UP_AMOUNT);
+  assert.equal(player.remote && player.glove && player.kick && player.bombPass && player.blockPass, true);
+  assert.equal(snapshot(state).players[0].protected, true);
+  assert.equal(state.powerups.length, 0);
+});
+
+test("remote control bombs wait and detonate on command", () => {
+  const state = baseState();
+  const player = state.players[0];
+  player.remote = true;
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+  step(state, { p1: { drop: true } });
+  const remoteBomb = state.bombs[0];
+  for (let tick = 0; tick < 100; tick += 1) step(state, {});
+  assert(state.bombs.some((candidate) => candidate.id === remoteBomb.id));
+  step(state, { p1: { detonate: true } });
+  assert.equal(state.bombs.some((candidate) => candidate.id === remoteBomb.id), false);
+});
+
+test("the glove throws an adjacent bomb over obstacles", () => {
+  const state = baseState();
+  const player = state.players[0];
+  player.glove = true;
+  player.facing = "right";
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+  const grid = state.grid.split("");
+  grid[indexOf(5, 3)] = WALL;
+  state.grid = grid.join("");
+  state.bombs = [bomb(1, 4, 3)];
+
+  step(state, { p1: { special: true } });
+
+  assert.equal(state.bombs[0].x, 7);
+  assert.equal(state.bombs[0].y, 3);
+  assert(state.bombs[0].airborneTtl > 0);
+});
+
+test("kick slides bombs while bomb pass and block pass open their tiles", () => {
+  const kicked = baseState();
+  const kicker = kicked.players[0];
+  kicker.kick = true;
+  kicker.x = 3.5 * TILE_SIZE;
+  kicker.y = 3.5 * TILE_SIZE;
+  kicked.bombs = [bomb(1, 4, 3)];
+  step(kicked, { p1: { dx: 1 } });
+  assert.equal(kicked.bombs[0].x, 5);
+  assert.equal(kicker.moveTarget.tileX, 4);
+
+  const pass = baseState();
+  const passer = pass.players[0];
+  passer.bombPass = true;
+  passer.blockPass = true;
+  passer.x = 3.5 * TILE_SIZE;
+  passer.y = 3.5 * TILE_SIZE;
+  pass.bombs = [bomb(1, 4, 3)];
+  const grid = pass.grid.split("");
+  grid[indexOf(3, 4)] = CRATE;
+  pass.grid = grid.join("");
+  step(pass, { p1: { dx: 1 } });
+  assert.equal(passer.moveTarget.tileX, 4);
+  passer.moveTarget = null;
+  passer.x = 3.5 * TILE_SIZE;
+  passer.y = 3.5 * TILE_SIZE;
+  step(pass, { p1: { dy: 1 } });
+  assert.equal(passer.moveTarget.tileY, 4);
+});
+
+test("the protection suit blocks blasts and falling death blocks crush the arena", () => {
+  const protectedState = baseState();
+  const protectedPlayer = protectedState.players[0];
+  protectedPlayer.x = 3.5 * TILE_SIZE;
+  protectedPlayer.y = 3.5 * TILE_SIZE;
+  protectedPlayer.invincibleUntilTick = 100;
+  protectedState.blasts = [{ x: 3, y: 3, ttl: 1 }];
+  step(protectedState, {});
+  assert.equal(protectedPlayer.alive, true);
+
+  const deathState = baseState();
+  const crushed = deathState.players[0];
+  crushed.x = 3.5 * TILE_SIZE;
+  crushed.y = 3.5 * TILE_SIZE;
+  assert.equal(dropDeathBlock(deathState, 3, 3), true);
+  for (let tick = 0; tick < 30 && deathState.status === "playing"; tick += 1) step(deathState, {});
+  assert.equal(deathState.grid[indexOf(3, 3)], WALL);
+  assert.equal(crushed.alive, false);
 });

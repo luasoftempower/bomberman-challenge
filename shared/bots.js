@@ -53,14 +53,16 @@ export function dangerTiles(state, extraBomb = null) {
   return new Set(dangerDeadlines(state, extraBomb).keys());
 }
 
-function traversable(state, x, y, start, extraBlocked = null) {
+function traversable(state, x, y, start, extraBlocked = null, player = null) {
   if (x < 0 || y < 0 || x >= BOARD_WIDTH || y >= BOARD_HEIGHT) return false;
-  if (tileAt(state.grid, x, y) !== EMPTY) return false;
+  const tile = tileAt(state.grid, x, y);
+  if (tile !== EMPTY && !(tile === CRATE && player?.blockPass)) return false;
   if (extraBlocked && keyOf(x, y) === extraBlocked && keyOf(x, y) !== keyOf(start.x, start.y)) return false;
+  if (player?.bombPass) return true;
   return !state.bombs.some((bomb) => bomb.x === x && bomb.y === y && keyOf(x, y) !== keyOf(start.x, start.y));
 }
 
-function bfs(state, start, isGoal, blocked = new Set(), extraBlocked = null) {
+function bfs(state, start, isGoal, blocked = new Set(), extraBlocked = null, player = null) {
   const queue = [{ ...start, path: [] }];
   const visited = new Set([keyOf(start.x, start.y)]);
   while (queue.length) {
@@ -69,7 +71,7 @@ function bfs(state, start, isGoal, blocked = new Set(), extraBlocked = null) {
     for (const direction of DIRECTIONS) {
       const next = { x: current.x + direction.x, y: current.y + direction.y };
       const key = keyOf(next.x, next.y);
-      if (visited.has(key) || blocked.has(key) || !traversable(state, next.x, next.y, start, extraBlocked)) continue;
+      if (visited.has(key) || blocked.has(key) || !traversable(state, next.x, next.y, start, extraBlocked, player)) continue;
       visited.add(key);
       queue.push({ ...next, path: [...current.path, next] });
     }
@@ -77,8 +79,8 @@ function bfs(state, start, isGoal, blocked = new Set(), extraBlocked = null) {
   return null;
 }
 
-function timedEscapeBfs(state, start, deadlines, extraBlocked = null, trafficBlocked = new Set()) {
-  const secondsPerTile = TILE_SIZE / MOVE_SPEED;
+function timedEscapeBfs(state, start, deadlines, extraBlocked = null, trafficBlocked = new Set(), player = null) {
+  const secondsPerTile = TILE_SIZE / (player?.moveSpeed || MOVE_SPEED);
   const safetyMargin = 0.28;
   const queue = [{ ...start, path: [] }];
   const visited = new Set([keyOf(start.x, start.y)]);
@@ -89,7 +91,7 @@ function timedEscapeBfs(state, start, deadlines, extraBlocked = null, trafficBlo
     for (const direction of DIRECTIONS) {
       const next = { x: current.x + direction.x, y: current.y + direction.y };
       const key = keyOf(next.x, next.y);
-      if (visited.has(key) || trafficBlocked.has(key) || !traversable(state, next.x, next.y, start, extraBlocked)) continue;
+      if (visited.has(key) || trafficBlocked.has(key) || !traversable(state, next.x, next.y, start, extraBlocked, player)) continue;
       const arrival = (current.path.length + 1) * secondsPerTile;
       const deadline = deadlines.get(key);
       if (deadline !== undefined && deadline <= arrival + safetyMargin) continue;
@@ -102,8 +104,9 @@ function timedEscapeBfs(state, start, deadlines, extraBlocked = null, trafficBlo
 
 export function findEscapePath(state, player, bombTile = null) {
   const start = { x: Math.floor(player.x / TILE_SIZE), y: Math.floor(player.y / TILE_SIZE) };
-  const bomb = bombTile ? { id: -1, ownerId: player.id, ...bombTile, range: BLAST_RANGE, fuse: FUSE_SECONDS } : { id: -1, ownerId: player.id, ...start, range: BLAST_RANGE, fuse: FUSE_SECONDS };
-  return timedEscapeBfs(state, start, dangerDeadlines(state, bomb), keyOf(bomb.x, bomb.y));
+  const range = player.fireRange || BLAST_RANGE;
+  const bomb = bombTile ? { id: -1, ownerId: player.id, ...bombTile, range, fuse: FUSE_SECONDS } : { id: -1, ownerId: player.id, ...start, range, fuse: FUSE_SECONDS };
+  return timedEscapeBfs(state, start, dangerDeadlines(state, bomb), keyOf(bomb.x, bomb.y), new Set(), player);
 }
 
 export function hasEscapeRoute(state, player, bombTile = null) {
@@ -128,7 +131,7 @@ function occupiedAndReservedTiles(state, player, additionalReservations) {
 
 function usefulBombTarget(state, player, start) {
   for (const direction of DIRECTIONS) {
-    for (let distance = 1; distance <= BLAST_RANGE; distance += 1) {
+    for (let distance = 1; distance <= (player.fireRange || BLAST_RANGE); distance += 1) {
       const x = start.x + direction.x * distance;
       const y = start.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
@@ -163,13 +166,14 @@ export function decideBotInput(state, playerId, additionalReservations = new Set
   const centered = !player.moveTarget && Math.abs(player.x - (start.x + 0.5) * TILE_SIZE) < 0.1 && Math.abs(player.y - (start.y + 0.5) * TILE_SIZE) < 0.1;
 
   if (danger.has(keyOf(start.x, start.y))) {
-    const path = timedEscapeBfs(state, start, deadlines, null, trafficBlocked)
-      || timedEscapeBfs(state, start, deadlines);
+    const path = timedEscapeBfs(state, start, deadlines, null, trafficBlocked, player)
+      || timedEscapeBfs(state, start, deadlines, null, new Set(), player);
     return path ? { input: inputToward(player, path[0]), path, urgent: true } : { input: { dx: 0, dy: 0, drop: false }, path: [], urgent: true };
   }
 
   const ownedBombs = state.bombs.filter((bomb) => bomb.ownerId === player.id).length;
-  const escapePath = centered && ownedBombs === 0 && usefulBombTarget(state, player, start) ? findEscapePath(state, player, start) : null;
+  const botBombLimit = Math.max(1, (player.maxBombs || 2) - 1);
+  const escapePath = centered && ownedBombs < botBombLimit && usefulBombTarget(state, player, start) ? findEscapePath(state, player, start) : null;
   if (escapePath) {
     return { input: { dx: 0, dy: 0, drop: true }, path: escapePath, urgent: true };
   }
@@ -183,6 +187,6 @@ export function decideBotInput(state, playerId, additionalReservations = new Set
     }
   }
   const routeBlocks = new Set([...danger, ...trafficBlocked]);
-  const path = bfs(state, start, (tile) => targets.has(keyOf(tile.x, tile.y)), routeBlocks);
+  const path = bfs(state, start, (tile) => targets.has(keyOf(tile.x, tile.y)), routeBlocks, null, player);
   return path ? { input: inputToward(player, path[0]), path, urgent: false } : { input: { dx: 0, dy: 0, drop: false }, path: [], urgent: false };
 }

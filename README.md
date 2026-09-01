@@ -1,32 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-# Blast Room
-
-A server-authoritative, real-time Bomberman-style game for up to four people. Create a room, share its link, and start a match; empty or disconnected seats are controlled by bots.
-
-## Run locally
-
-Requires Node.js 22+ and pnpm.
-
-```sh
-pnpm install
-pnpm dev
-```
-
-Open `http://localhost:3000`. The same command runs the Vite client and the Node/WebSocket server.
-
-## Verify
-
-```sh
-pnpm test
-pnpm build
-```
-
-The project includes a multi-stage Dockerfile and a Render Blueprint. Set `PUBLIC_ORIGIN` to the final HTTPS origin so social share cards use an absolute image URL.
-=======
-# bomberman-challenge
->>>>>>> d6510d62696bd83918db44147dc993f893971729
-=======
 <p align="center">
   <img src="public/bomberlan-logo-transparent.png" alt="Logo do Bomberlan" width="450">
 </p>
@@ -58,6 +29,8 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 - 🎨 **Pixel Art:** Personagens, arenas, menus, contagem regressiva e telas de vitória totalmente animados.
 - 📱 **Controles Híbridos:** Suporte completo para teclado e dispositivos com tela sensível ao toque.
 - 🔌 **Tempo Real:** Comunicação via WebSocket usando arquitetura autoritativa.
+- ⏱️ **Dois Modos:** Bomberlan clássico (1:30, sem itens) e Super Bomberlan (3:00, power-ups e Sudden Death).
+- 💥 **Dez Power-ups:** Fogo, Bomba, Patins, Controle Remoto, Luva, Chute, Passagem de Bomba, Passagem de Bloco, Colete e Fogo Cheio.
 
 ---
 
@@ -67,6 +40,8 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 | :--- | :--- | :--- |
 | **Movimentar** | `WASD` ou Setas Direcionais | Direcional na Tela |
 | **Colocar Bomba** | `Espaço` | Botão Virtual |
+| **Detonar Bomba Remota** | `E` | Botão Remoto |
+| **Arremessar com a Luva** | `Q` | Botão Luva |
 
 > **Objetivo:** Sobreviver às explosões, eliminar seus oponentes e ser o último jogador vivo na arena!
 
@@ -91,7 +66,7 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 ### 1. Clonar e Instalar
 ```bash
 # Clone o repositório
-git clone https://github.com
+git clone https://github.com/luasoftempower/bomberman-challenge.git
 
 # Acesse a pasta do projeto
 cd bomberman-challenge
@@ -163,4 +138,3 @@ Este projeto é um **protótipo jogável em desenvolvimento ativo**. Sugestões,
 ## 📄 Licença
 
 Consulte o arquivo [LICENSE](LICENSE) para conhecer os termos de uso e direitos autorais do projeto.
->>>>>>> e1d4b9e6430ba42826193cf0423b78a20eded43a

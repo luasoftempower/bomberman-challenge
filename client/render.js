@@ -55,6 +55,72 @@ function drawCrate(context, left, top) {
   px(context, "#361821", left + 17, top + 17, 6, 6);
 }
 
+const POWERUP_COLORS = {
+  fire: ["#ff613d", "#ffd24d"], bomb: ["#776dff", "#dad5ff"], speed: ["#26d7f2", "#c8ff50"],
+  remote: ["#ff4f7d", "#ffe45c"], glove: ["#ff79b8", "#fff0f7"], kick: ["#f2b43d", "#fff173"],
+  bombPass: ["#7774a8", "#8ff4ff"], blockPass: ["#b76b3e", "#f2b35e"], suit: ["#55dff7", "#ecffff"],
+  fullFire: ["#ff365f", "#c8ff50"],
+};
+
+function drawPowerup(context, powerup, animationTime) {
+  const left = powerup.x * TILE_SIZE;
+  const top = powerup.y * TILE_SIZE + Math.round(Math.sin(animationTime * 5 + powerup.id) * 2);
+  const [main, light] = POWERUP_COLORS[powerup.type] || POWERUP_COLORS.fire;
+  const pulse = Math.floor(animationTime * 8 + powerup.id) % 2;
+  px(context, "rgba(0,0,0,.38)", left + 8, top + 31, 25, 4);
+  px(context, "#090c18", left + 5, top + 5, 30, 29);
+  px(context, pulse ? "#4b3d74" : "#332a55", left + 7, top + 7, 26, 25);
+  px(context, main, left + 9, top + 9, 22, 21);
+  px(context, light, left + 11, top + 10, 18, 3);
+  px(context, "rgba(8,10,20,.4)", left + 11, top + 27, 18, 2);
+
+  if (powerup.type === "fire" || powerup.type === "fullFire") {
+    px(context, "#801a35", left + 17, top + 14, 8, 13);
+    px(context, "#ff4b32", left + 14, top + 19, 12, 8);
+    px(context, "#fff26b", left + 18, top + 17, 6, 9);
+    if (powerup.type === "fullFire") px(context, "#ffffff", left + 12, top + 12, 4, 4);
+  } else if (powerup.type === "bomb" || powerup.type === "bombPass") {
+    px(context, "#080b14", left + 13, top + 16, 14, 12);
+    px(context, "#262440", left + 15, top + 15, 10, 11);
+    px(context, light, left + 23, top + 12, 5, 4);
+    if (powerup.type === "bombPass") {
+      px(context, "#ecffff", left + 10, top + 19, 4, 4);
+      px(context, "#ecffff", left + 27, top + 19, 4, 4);
+    }
+  } else if (powerup.type === "speed") {
+    px(context, "#071522", left + 12, top + 22, 17, 6);
+    px(context, "#f4ffff", left + 14, top + 16, 9, 8);
+    px(context, "#c8ff50", left + 22, top + 20, 7, 5);
+    px(context, "#071522", left + 15, top + 28, 4, 3);
+    px(context, "#071522", left + 25, top + 28, 4, 3);
+  } else if (powerup.type === "remote") {
+    px(context, "#151627", left + 13, top + 13, 14, 16);
+    px(context, "#f4f2ff", left + 15, top + 15, 10, 4);
+    px(context, "#ff365f", left + 17, top + 22, 6, 5);
+    px(context, "#ffe45c", left + 24, top + 11, 3, 4);
+  } else if (powerup.type === "glove") {
+    px(context, "#7e244e", left + 13, top + 18, 15, 10);
+    px(context, "#fff0f7", left + 15, top + 14, 4, 9);
+    px(context, "#fff0f7", left + 20, top + 13, 4, 10);
+    px(context, "#fff0f7", left + 25, top + 16, 4, 9);
+  } else if (powerup.type === "kick") {
+    px(context, "#3e2630", left + 13, top + 14, 8, 13);
+    px(context, "#fff173", left + 16, top + 15, 7, 10);
+    px(context, "#fff173", left + 21, top + 22, 9, 6);
+    px(context, "#3e2630", left + 13, top + 27, 17, 3);
+  } else if (powerup.type === "blockPass") {
+    px(context, "#542719", left + 12, top + 14, 17, 15);
+    px(context, "#ffd174", left + 14, top + 16, 5, 11);
+    px(context, "#ffd174", left + 23, top + 16, 4, 11);
+    px(context, "#33223a", left + 19, top + 19, 4, 8);
+  } else if (powerup.type === "suit") {
+    px(context, "#ecffff", left + 13, top + 13, 14, 5);
+    px(context, "#166a9e", left + 14, top + 18, 12, 8);
+    px(context, "#ecffff", left + 17, top + 18, 6, 10);
+    px(context, "#166a9e", left + 19, top + 20, 3, 5);
+  }
+}
+
 function drawBlast(context, blast, animationTime) {
   const left = blast.x * TILE_SIZE;
   const top = blast.y * TILE_SIZE;
@@ -75,8 +141,21 @@ function drawBlast(context, blast, animationTime) {
 }
 
 function drawBomb(context, bomb, animationTime) {
-  const x = Math.round((bomb.x + 0.5) * TILE_SIZE);
-  const y = Math.round((bomb.y + 0.5) * TILE_SIZE);
+  let bombX = bomb.x;
+  let bombY = bomb.y;
+  let arc = 0;
+  if (bomb.airborneTtl > 0 && Number.isFinite(bomb.throwFromX)) {
+    const progress = 1 - bomb.airborneTtl / (bomb.throwDuration || 0.42);
+    bombX = bomb.throwFromX + (bomb.x - bomb.throwFromX) * progress;
+    bombY = bomb.throwFromY + (bomb.y - bomb.throwFromY) * progress;
+    arc = Math.sin(progress * Math.PI) * 30;
+  } else if (bomb.slideVisualTtl > 0 && Number.isFinite(bomb.slideFromX)) {
+    const progress = 1 - bomb.slideVisualTtl / 0.12;
+    bombX = bomb.slideFromX + (bomb.x - bomb.slideFromX) * progress;
+    bombY = bomb.slideFromY + (bomb.y - bomb.slideFromY) * progress;
+  }
+  const x = Math.round((bombX + 0.5) * TILE_SIZE);
+  const y = Math.round((bombY + 0.5) * TILE_SIZE - arc);
   const alert = bomb.fuse < 0.7 && Math.floor(animationTime * 12) % 2 === 0;
   const outline = alert ? "#ff4969" : "#080b14";
   px(context, "rgba(0,0,0,.35)", x - 12, y + 12, 27, 5);
@@ -91,6 +170,26 @@ function drawBomb(context, bomb, animationTime) {
   px(context, "#a675ff", x + 11, y - 20, 5, 4);
   px(context, bomb.fuse < 0.7 ? "#ff4267" : "#c8ff50", x + 15, y - 23, 5, 5);
   px(context, "#fff3a0", x + 17, y - 25, 3, 3);
+}
+
+function drawFallingBlock(context, block, animationTime) {
+  const progress = 1 - block.ttl / (block.duration || 0.62);
+  const left = block.x * TILE_SIZE;
+  const targetTop = block.y * TILE_SIZE;
+  const top = targetTop - (1 - progress) * 105;
+  const flash = Math.floor(animationTime * 12) % 2 === 0;
+  context.globalAlpha = 0.42 + progress * 0.35;
+  px(context, flash ? "#ff365f" : "#ffd24d", left + 3, targetTop + 3, 34, 34);
+  px(context, "#120b18", left + 8, targetTop + 8, 24, 24);
+  context.globalAlpha = 1;
+  px(context, "rgba(0,0,0,.45)", left + 5, targetTop + 31, 30, 6);
+  px(context, "#120e1d", left + 1, top + 1, 38, 38);
+  px(context, "#3b3554", left + 4, top + 4, 32, 31);
+  px(context, "#756d94", left + 6, top + 6, 28, 5);
+  px(context, "#211d35", left + 7, top + 29, 27, 5);
+  px(context, "#ff365f", left + 17, top + 13, 6, 15);
+  px(context, "#ff365f", left + 12, top + 18, 16, 6);
+  px(context, "#ffe45c", left + 18, top + 16, 4, 9);
 }
 
 const spriteMotion = new Map();
@@ -155,6 +254,17 @@ function drawPlayer(context, player, palette, animationTime) {
   const leftStep = motion.moving && motion.frame ? 2 : 0;
   const rightStep = motion.moving && !motion.frame ? -2 : 0;
   const armSwing = motion.moving ? (motion.frame ? 2 : -2) : 0;
+
+  if (player.protected) {
+    const pulse = 18 + Math.sin(animationTime * 8 + player.slot) * 2;
+    context.strokeStyle = Math.floor(animationTime * 10) % 2 ? "#7ff9ff" : "#f4ffff";
+    context.lineWidth = 3;
+    context.globalAlpha = 0.72;
+    context.beginPath();
+    context.arc(x, y - 4, pulse, 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = 1;
+  }
 
   px(context, "rgba(0,0,0,.42)", x - 13, y + 12, 26, 5);
 
@@ -337,7 +447,6 @@ function drawCryingMascot(context, palette, elapsed) {
   px(context, "#55dff7", x + 4, y - 8 + ((tearFall + 10) % 24), 3, 6);
   px(context, "#2588ce", x + 4, y - 3 + ((tearFall + 10) % 24), 3, 3);
 }
-
 function drawJugglingBomb(context, x, y, sparkFrame) {
   px(context, "rgba(0,0,0,.2)", x - 6, y + 6, 13, 3);
   px(context, "#070a12", x - 6, y - 6, 12, 14);
@@ -494,8 +603,10 @@ export function renderGame(canvas, state) {
       }
     }
   }
-  for (const blast of state.blasts) drawBlast(context, blast, animationTime);
-  for (const bomb of state.bombs) drawBomb(context, bomb, animationTime);
-  for (const player of state.players) drawPlayer(context, player, CHARACTER_PALETTES[player.slot], animationTime);
+  for (const powerup of state.powerups || []) drawPowerup(context, powerup, animationTime);
+  for (const blast of state.blasts || []) drawBlast(context, blast, animationTime);
+  for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
+  for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot], animationTime);
+  for (const block of state.fallingBlocks || []) drawFallingBlock(context, block, animationTime);
 }
 
