@@ -11,18 +11,28 @@ function stateWith(player) {
   };
 }
 
-test("local reconciliation never rewinds a player moving right", () => {
+test("local movement keeps advancing while an authoritative snapshot is stale", () => {
   const target = { id: "self", x: 80, y: 60, moveSpeed: 112, facing: "right", moveTarget: { x: 100, y: 60, tileX: 2, tileY: 1 } };
-  const current = { ...target, x: 90 };
+  const current = { ...target, x: 90, moveTarget: { ...target.moveTarget } };
   const result = reconcileLocalPlayer(current, target, stateWith(target), { dx: 1, dy: 0 }, 16, 0);
-  assert.equal(result.x, current.x);
+  assert(result.x > current.x);
+  assert.equal(result.y, current.y);
 });
 
-test("local reconciliation never rewinds a player moving down", () => {
-  const target = { id: "self", x: 60, y: 80, moveSpeed: 112, facing: "down", moveTarget: { x: 60, y: 100, tileX: 1, tileY: 2 } };
-  const current = { ...target, y: 90 };
-  const result = reconcileLocalPlayer(current, target, stateWith(target), { dx: 0, dy: 1 }, 16, 0);
-  assert.equal(result.y, current.y);
+test("local movement crosses a tile boundary without waiting for the next snapshot", () => {
+  const target = { id: "self", x: 98, y: 60, moveSpeed: 112, facing: "right", moveTarget: { x: 100, y: 60, tileX: 2, tileY: 1 } };
+  const current = { ...target, x: 100, moveTarget: null };
+  const result = reconcileLocalPlayer(current, target, stateWith(target), { dx: 1, dy: 0 }, 16, 0);
+  assert(result.x > 100);
+  assert.equal(result.moveTarget?.tileX, 3);
+});
+
+test("a buffered turn does not rewind while the server finishes the previous tile", () => {
+  const target = { id: "self", x: 97, y: 60, moveSpeed: 112, facing: "right", moveTarget: { x: 100, y: 60, tileX: 2, tileY: 1 } };
+  const current = { ...target, x: 100, y: 70, facing: "down", moveTarget: { x: 100, y: 100, tileX: 2, tileY: 2 } };
+  const result = reconcileLocalPlayer(current, target, stateWith(target), { dx: 0, dy: 1 }, 16, 20);
+  assert.equal(result.x, current.x);
+  assert(result.y > current.y);
 });
 
 test("an idle player still converges to an authoritative correction", () => {

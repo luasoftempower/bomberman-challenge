@@ -62,38 +62,67 @@ export function projectLocalPlayer(target, state, input, horizonMs) {
   return projected;
 }
 
-function authoritativeDirection(target, input) {
-  if (target.moveTarget) {
-    return {
-      x: Math.sign(target.moveTarget.x - target.x),
-      y: Math.sign(target.moveTarget.y - target.y),
-    };
+export function advanceLocalPlayer(current, state, input, elapsedMs) {
+  const advanced = { ...current, moveTarget: current.moveTarget ? { ...current.moveTarget } : null };
+  let remaining = Math.max(0, elapsedMs) / 1000;
+  let segments = 0;
+
+  // The local player advances from the last rendered position. Network snapshots
+  // therefore cannot reset the prediction clock and produce a pause at tile edges.
+  while (remaining > 0.0001 && segments < 3) {
+    if (!advanced.moveTarget) {
+      const direction = cardinalInput(input);
+      if (!direction) break;
+      const currentTileX = Math.round(advanced.x / TILE_SIZE - 0.5);
+      const currentTileY = Math.round(advanced.y / TILE_SIZE - 0.5);
+      const tileX = currentTileX + direction.x;
+      const tileY = currentTileY + direction.y;
+      if (tileBlocked(state, advanced, tileX, tileY)) break;
+      advanced.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+      advanced.facing = facingFor(direction, advanced.facing);
+    }
+
+    const dx = advanced.moveTarget.x - advanced.x;
+    const dy = advanced.moveTarget.y - advanced.y;
+    const distance = Math.abs(dx) + Math.abs(dy);
+    const playerSpeed = advanced.moveSpeed || MOVE_SPEED;
+    const availableTravel = playerSpeed * remaining;
+    if (availableTravel < distance) {
+      if (dx) advanced.x += Math.sign(dx) * availableTravel;
+      else if (dy) advanced.y += Math.sign(dy) * availableTravel;
+      break;
+    }
+
+    advanced.x = advanced.moveTarget.x;
+    advanced.y = advanced.moveTarget.y;
+    advanced.moveTarget = null;
+    remaining -= distance / playerSpeed;
+    segments += 1;
   }
-  return cardinalInput(input);
+  return advanced;
 }
 
 export function reconcileLocalPlayer(current, target, state, input, elapsedMs, predictionMs) {
-  const hardDesync = Math.abs(current.x - target.x) > TILE_SIZE * 1.5
-    || Math.abs(current.y - target.y) > TILE_SIZE * 1.5;
-  if (hardDesync) return { x: target.x, y: target.y, facing: target.facing };
-
+  const advanced = advanceLocalPlayer(current, state, input, elapsedMs);
   const projected = projectLocalPlayer(target, state, input, predictionMs);
-  const direction = authoritativeDirection(target, input);
-  let dx = projected.x - current.x;
-  let dy = projected.y - current.y;
+  const dx = projected.x - advanced.x;
+  const dy = projected.y - advanced.y;
+  const hardDesync = Math.abs(dx) > TILE_SIZE * 1.5 || Math.abs(dy) > TILE_SIZE * 1.5;
+  if (hardDesync) return projected;
 
-  // Prediction may wait for the authoritative state to catch up, but must never
-  // visibly rewind along the currently requested path (the classic rubber-band).
-  if ((direction?.x > 0 && dx < 0) || (direction?.x < 0 && dx > 0)) dx = 0;
-  if ((direction?.y > 0 && dy < 0) || (direction?.y < 0 && dy > 0)) dy = 0;
+  // While a tile is being crossed, local integration owns the visual position.
+  // This removes both rollback and the small wait introduced whenever a fresh
+  // snapshot resets its age. Once stopped, any real server correction converges
+  // smoothly instead of teleporting the character.
+  if (advanced.moveTarget || cardinalInput(input)) return advanced;
 
   const distance = Math.abs(dx) + Math.abs(dy);
   const playerSpeed = target.moveSpeed || MOVE_SPEED;
   const speed = playerSpeed + Math.min(playerSpeed, distance * 8);
   const travel = Math.min(speed * Math.max(0, elapsedMs) / 1000, distance);
-  let x = current.x;
-  let y = current.y;
+  let x = advanced.x;
+  let y = advanced.y;
   if (dx) x += Math.sign(dx) * travel;
   else if (dy) y += Math.sign(dy) * travel;
-  return { x, y, facing: projected.facing };
+  return { ...advanced, x, y, facing: projected.facing };
 }

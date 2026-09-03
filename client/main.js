@@ -110,15 +110,21 @@ function startRenderLoop() {
       const displayById = new Map(displaySnapshot.players.map((candidate) => [candidate.id, candidate]));
       const players = latestSnapshot.players.map((target) => {
         const current = displayById.get(target.id) || { ...target };
-        if (target.id === player?.playerId) updateLocalDisplay(current, target, latestSnapshot, elapsed, predictionMs);
-        else {
+        if (target.id === player?.playerId) {
+          updateLocalDisplay(current, target, latestSnapshot, elapsed, predictionMs);
+          const displayX = current.x;
+          const displayY = current.y;
+          const displayFacing = current.facing;
+          const displayMoveTarget = current.moveTarget ? { ...current.moveTarget } : null;
+          Object.assign(current, target, { x: displayX, y: displayY, facing: displayFacing, moveTarget: displayMoveTarget });
+        } else {
           current.x += (target.x - current.x) * smoothing;
           current.y += (target.y - current.y) * smoothing;
+          const displayX = current.x;
+          const displayY = current.y;
+          const displayFacing = current.facing;
+          Object.assign(current, target, { x: displayX, y: displayY, facing: displayFacing });
         }
-        const displayX = current.x;
-        const displayY = current.y;
-        const displayFacing = current.facing;
-        Object.assign(current, target, { x: displayX, y: displayY, facing: displayFacing });
         return current;
       });
       displaySnapshot = { ...latestSnapshot, players };
