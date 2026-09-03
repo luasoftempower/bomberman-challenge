@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { reconcileLocalPlayer } from "../client/netcode.js";
-import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY } from "../shared/constants.js";
+import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY, WALL } from "../shared/constants.js";
 
 function stateWith(player) {
   return {
@@ -33,6 +33,20 @@ test("a buffered turn does not rewind while the server finishes the previous til
   const result = reconcileLocalPlayer(current, target, stateWith(target), { dx: 0, dy: 1 }, 16, 20);
   assert.equal(result.x, current.x);
   assert(result.y > current.y);
+});
+
+test("a prediction stranded on the wrong tile recovers toward the server", () => {
+  const target = { id: "self", x: 60, y: 60, moveSpeed: 112, facing: "down", moveTarget: { x: 60, y: 100, tileX: 1, tileY: 2 } };
+  const current = { ...target, x: 100, moveTarget: null };
+  const state = stateWith(target);
+  const blockedIndex = 2 * BOARD_WIDTH + 2;
+  state.grid = `${state.grid.slice(0, blockedIndex)}${WALL}${state.grid.slice(blockedIndex + 1)}`;
+
+  const result = reconcileLocalPlayer(current, target, state, { dx: 0, dy: 1 }, 16, 20);
+
+  assert(result.x < current.x);
+  assert(result.x > target.x);
+  assert.equal(result.moveTarget, null);
 });
 
 test("an idle player still converges to an authoritative correction", () => {

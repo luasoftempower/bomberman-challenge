@@ -110,19 +110,29 @@ export function reconcileLocalPlayer(current, target, state, input, elapsedMs, p
   const hardDesync = Math.abs(dx) > TILE_SIZE * 1.5 || Math.abs(dy) > TILE_SIZE * 1.5;
   if (hardDesync) return projected;
 
+  const localTravel = Math.abs(advanced.x - current.x) + Math.abs(advanced.y - current.y);
+  const serverTravel = Math.abs(projected.x - target.x) + Math.abs(projected.y - target.y);
+  const separation = Math.abs(dx) + Math.abs(dy);
+  const strandedPrediction = cardinalInput(input)
+    && localTravel < 0.001
+    && serverTravel > 0.001
+    && separation > TILE_SIZE * 0.65;
+
   // While a tile is being crossed, local integration owns the visual position.
   // This removes both rollback and the small wait introduced whenever a fresh
-  // snapshot resets its age. Once stopped, any real server correction converges
-  // smoothly instead of teleporting the character.
-  if (advanced.moveTarget || cardinalInput(input)) return advanced;
+  // snapshot resets its age. The exception repairs an invalid prediction: if the
+  // local player is blocked on one tile while the server is moving on another,
+  // it must converge instead of remaining permanently stranded there.
+  if ((advanced.moveTarget || cardinalInput(input)) && !strandedPrediction) return advanced;
 
   const distance = Math.abs(dx) + Math.abs(dy);
   const playerSpeed = target.moveSpeed || MOVE_SPEED;
-  const speed = playerSpeed + Math.min(playerSpeed, distance * 8);
+  const recoveryBoost = strandedPrediction ? playerSpeed * 1.5 : 0;
+  const speed = playerSpeed + recoveryBoost + Math.min(playerSpeed, distance * 8);
   const travel = Math.min(speed * Math.max(0, elapsedMs) / 1000, distance);
   let x = advanced.x;
   let y = advanced.y;
   if (dx) x += Math.sign(dx) * travel;
   else if (dy) y += Math.sign(dy) * travel;
-  return { ...advanced, x, y, facing: projected.facing };
+  return { ...advanced, x, y, facing: projected.facing, moveTarget: strandedPrediction ? null : advanced.moveTarget };
 }
