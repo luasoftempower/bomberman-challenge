@@ -5,8 +5,9 @@ import { createMatch, createSuddenDeathOrder, dropDeathBlock, snapshot, step } f
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MATCH_COUNTDOWN_MS = 4420;
-const NETWORK_RATE = 20;
-const SNAPSHOT_INTERVAL_TICKS = Math.max(1, Math.round(TICK_RATE / NETWORK_RATE));
+const NETWORK_RATE = 30;
+const SNAPSHOT_INTERVAL_MS = 1000 / NETWORK_RATE;
+const MAX_SNAPSHOT_BACKLOG_BYTES = 16 * 1024;
 const MAX_CATCH_UP_STEPS = 8;
 const DIRECTION_VECTORS = {
   left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
@@ -28,8 +29,11 @@ export function makeCode() {
   return [...bytes].map((byte) => CODE_ALPHABET[byte % CODE_ALPHABET.length]).join("");
 }
 
-const send = (socket, message) => {
-  if (socket?.readyState === 1) socket.send(JSON.stringify(message));
+const send = (socket, message, volatile = false) => {
+  if (socket?.readyState !== 1) return false;
+  if (volatile && (socket.bufferedAmount || 0) > MAX_SNAPSHOT_BACKLOG_BYTES) return false;
+  socket.send(JSON.stringify(message));
+  return true;
 };
 
 export class Room {
@@ -55,7 +59,7 @@ export class Room {
     this.nextDeathBlockAt = 0;
     this.emptySince = null;
     this.nextSimulationAt = 0;
-    this.lastBroadcastTick = 0;
+    this.nextSnapshotAt = 0;
   }
 
   humanCount() {
@@ -82,7 +86,8 @@ export class Room {
   }
 
   broadcast(message) {
-    for (const slot of this.slots) if (slot.kind === "human") send(slot.socket, message);
+    const volatile = message.type === "snapshot";
+    for (const slot of this.slots) if (slot.kind === "human") send(slot.socket, message, volatile);
   }
 
   lobbyPayload() {
@@ -163,7 +168,7 @@ export class Room {
     this.phase = "playing";
     this.startsAt = Date.now() + MATCH_COUNTDOWN_MS;
     this.nextSimulationAt = this.startsAt;
-    this.lastBroadcastTick = 0;
+    this.nextSnapshotAt = this.startsAt;
     const durationMs = this.gameMode === GAME_MODES.SUPER ? SUPER_MATCH_DURATION_MS : MATCH_DURATION_MS;
     this.endsAt = this.startsAt + durationMs;
     this.suddenDeathQueue = this.gameMode === GAME_MODES.SUPER ? createSuddenDeathOrder(this.state.grid) : [];
@@ -185,6 +190,7 @@ export class Room {
     this.phase = "lobby";
     this.startsAt = 0;
     this.nextSimulationAt = 0;
+    this.nextSnapshotAt = 0;
     this.endsAt = 0;
     this.endReason = null;
     this.suddenDeathQueue = [];
@@ -247,12 +253,13 @@ export class Room {
     }
 
     const remainingMs = Math.max(0, this.endsAt - now);
-    const snapshotDue = this.state.tick === 1
-      || this.state.tick - this.lastBroadcastTick >= SNAPSHOT_INTERVAL_TICKS
-      || this.state.status === "ended";
+    const snapshotDue = now + 0.01 >= this.nextSnapshotAt || this.state.status === "ended";
     if (snapshotDue) {
       this.broadcast({ type: "snapshot", ...snapshot(this.state), remainingMs, serverTime: now, networkRate: NETWORK_RATE });
-      this.lastBroadcastTick = this.state.tick;
+      if (this.state.status !== "ended") {
+        do this.nextSnapshotAt += SNAPSHOT_INTERVAL_MS;
+        while (this.nextSnapshotAt <= now);
+      }
     }
     if (this.state.status === "ended" && !this.endAnnounced) {
       this.phase = "ended";

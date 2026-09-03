@@ -9,7 +9,11 @@ const app = express();
 const server = createServer(app);
 const port = Number(process.env.PORT || 3000);
 const rooms = new Map();
-const webSockets = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+const webSockets = new WebSocketServer({
+  noServer: true,
+  maxPayload: 4096,
+  perMessageDeflate: { threshold: 512, concurrencyLimit: 4 },
+});
 
 app.use(express.json({ limit: "8kb" }));
 

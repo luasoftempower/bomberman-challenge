@@ -1,8 +1,9 @@
 import "./styles.css";
 import { initializeAudio, playBombExplosionSound, playDeathSound, playDrawSound, playLuaSoftSound, playMatchCountdown, playWinSound, setMenuMusicActive, setWalkingSoundActive, startBattleTheme, stopMatchAudio } from "./audio.js";
 import { createInputController } from "./input.js";
+import { reconcileLocalPlayer } from "./netcode.js";
 import { renderGame, startMenuMascotAnimation, startResultCharacterAnimation, startVictoryAnimation } from "./render.js";
-import { BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MOVE_SPEED, PLAYER_COLORS, TILE_SIZE } from "../shared/constants.js";
+import { GAME_MODES, MOVE_SPEED, PLAYER_COLORS } from "../shared/constants.js";
 
 const root = document.querySelector("#app");
 initializeAudio();
@@ -31,10 +32,12 @@ let lastLobbyGameMode = null;
 let matchIntroTimers = [];
 let localInput = { dx: 0, dy: 0, drop: false, detonate: false, special: false };
 let latestSnapshotReceivedAt = 0;
-let estimatedRtt = 100;
+let estimatedRtt = 0;
+let rttSamples = [];
 let latencyTimer = null;
 
-const MAX_PREDICTION_MS = 280;
+const MAX_PREDICTION_MS = 220;
+const MATCH_TRANSITION_MS = 680;
 const WIN_SOUND_MUSIC_CUE_MS = 4150;
 const RESULT_BOARD_REVEAL_MS = 1250;
 const DRAW_BOARD_REVEAL_MS = 2800;
@@ -79,89 +82,17 @@ function stopMatchIntro() {
 }
 
 function copySnapshot(state) {
-  return state ? { ...state, players: state.players.map((candidate) => ({ ...candidate })) } : null;
-}
-
-function cardinalInput(input) {
-  if (input.dx) return { x: Math.sign(input.dx), y: 0 };
-  if (input.dy) return { x: 0, y: Math.sign(input.dy) };
-  return null;
-}
-
-function predictionTileBlocked(state, self, tileX, tileY) {
-  const tile = state.grid?.[tileY * BOARD_WIDTH + tileX];
-  if (tile !== EMPTY && !(tile === CRATE && self.blockPass)) return true;
-  if (!self.bombPass && state.bombs?.some((bomb) => bomb.x === tileX && bomb.y === tileY)) return true;
-  return state.players.some((candidate) => {
-    if (!candidate.alive || candidate.id === self.id) return false;
-    const occupiesTile = Math.floor(candidate.x / TILE_SIZE) === tileX && Math.floor(candidate.y / TILE_SIZE) === tileY;
-    const reservesTile = candidate.moveTarget?.tileX === tileX && candidate.moveTarget?.tileY === tileY;
-    return occupiesTile || reservesTile;
-  });
-}
-
-function facingFor(direction, fallback = "down") {
-  if (direction?.x > 0) return "right";
-  if (direction?.x < 0) return "left";
-  if (direction?.y > 0) return "down";
-  if (direction?.y < 0) return "up";
-  return fallback;
-}
-
-function projectLocalPlayer(target, state, horizonMs) {
-  const projected = {
-    ...target,
-    moveTarget: target.moveTarget ? { ...target.moveTarget } : null,
-  };
-  let remaining = Math.max(0, horizonMs) / 1000;
-  let segments = 0;
-  while (remaining > 0.0001 && segments < 4) {
-    if (!projected.moveTarget) {
-      const direction = cardinalInput(localInput);
-      if (!direction) break;
-      const currentTileX = Math.round(projected.x / TILE_SIZE - 0.5);
-      const currentTileY = Math.round(projected.y / TILE_SIZE - 0.5);
-      const tileX = currentTileX + direction.x;
-      const tileY = currentTileY + direction.y;
-      if (predictionTileBlocked(state, projected, tileX, tileY)) break;
-      projected.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
-      projected.facing = facingFor(direction, projected.facing);
-    }
-
-    const dx = projected.moveTarget.x - projected.x;
-    const dy = projected.moveTarget.y - projected.y;
-    const distance = Math.abs(dx) + Math.abs(dy);
-    const playerSpeed = projected.moveSpeed || MOVE_SPEED;
-    const availableTravel = playerSpeed * remaining;
-    if (availableTravel < distance) {
-      if (dx) projected.x += Math.sign(dx) * availableTravel;
-      else if (dy) projected.y += Math.sign(dy) * availableTravel;
-      break;
-    }
-    projected.x = projected.moveTarget.x;
-    projected.y = projected.moveTarget.y;
-    projected.moveTarget = null;
-    remaining -= distance / playerSpeed;
-    segments += 1;
-  }
-  return projected;
+  return state ? {
+    ...state,
+    players: state.players.map((candidate) => ({
+      ...candidate,
+      moveTarget: candidate.moveTarget ? { ...candidate.moveTarget } : null,
+    })),
+  } : null;
 }
 
 function updateLocalDisplay(current, target, state, elapsed, predictionMs) {
-  if (Math.abs(current.x - target.x) > TILE_SIZE * 1.5 || Math.abs(current.y - target.y) > TILE_SIZE * 1.5) {
-    current.x = target.x;
-    current.y = target.y;
-  }
-  const projected = projectLocalPlayer(target, state, predictionMs);
-  const dx = projected.x - current.x;
-  const dy = projected.y - current.y;
-  const distance = Math.abs(dx) + Math.abs(dy);
-  const playerSpeed = target.moveSpeed || MOVE_SPEED;
-  const speed = playerSpeed + Math.min(playerSpeed * 2, distance * 10);
-  const travel = Math.min(speed * elapsed / 1000, distance);
-  if (dx) current.x += Math.sign(dx) * travel;
-  else if (dy) current.y += Math.sign(dy) * travel;
-  current.facing = projected.facing;
+  Object.assign(current, reconcileLocalPlayer(current, target, state, localInput, elapsed, predictionMs));
 }
 
 function startRenderLoop() {
@@ -344,6 +275,8 @@ function renderLobbyReturnTransition(message) {
 function connectToRoom(code, name, hostToken = null) {
   clearInterval(latencyTimer);
   latencyTimer = null;
+  estimatedRtt = 0;
+  rttSamples = [];
   clearRoomTransition();
   lobbyMounted = false;
   roomTransitionStartedAt = performance.now();
@@ -386,15 +319,38 @@ function queueLobbyReveal(lobby) {
   }, remaining);
 }
 
+function transitionToMatch(start) {
+  const lobbyShell = root.querySelector(".lobby-shell");
+  if (!lobbyShell) {
+    renderMatch(start);
+    return;
+  }
+  stopMatchIntro();
+  const transitionStartedAt = performance.now();
+  lobbyShell.classList.add("match-starting");
+  root.insertAdjacentHTML("beforeend", `<section class="match-loading-transition" role="status" aria-live="assertive"><div class="match-loading-grid" aria-hidden="true"></div><div class="match-loading-beam" aria-hidden="true"></div><div class="match-loading-content"><span>PARTIDA CONFIRMADA</span><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /><b>ENTRANDO NA ARENA</b><div><i></i></div></div></section>`);
+  matchIntroTimers.push(setTimeout(() => {
+    const elapsed = performance.now() - transitionStartedAt;
+    const networkTravel = estimatedRtt / 2;
+    renderMatch({ ...start, countdownMs: Math.max(3200, (Number(start.countdownMs) || 4420) - elapsed - networkTravel) });
+  }, MATCH_TRANSITION_MS));
+}
+
 function handleMessage(message) {
   if (message.type === "joined") { player = message; startLatencyMonitoring(); }
   else if (message.type === "pong") {
     const sample = Date.now() - Number(message.clientTime);
-    if (Number.isFinite(sample) && sample >= 0 && sample < 5000) estimatedRtt = estimatedRtt * 0.75 + sample * 0.25;
+    if (Number.isFinite(sample) && sample >= 0 && sample < 5000) {
+      rttSamples.push(sample);
+      if (rttSamples.length > 12) rttSamples.shift();
+      // The lowest recent RTT best represents transport latency; queueing spikes
+      // should not push visual prediction farther ahead and cause later rollback.
+      estimatedRtt = Math.min(...rttSamples);
+    }
   }
   else if (message.type === "lobbyReturn") renderLobbyReturnTransition(message);
   else if (message.type === "lobby") queueLobbyReveal(message);
-  else if (message.type === "matchStart") renderMatch(message);
+  else if (message.type === "matchStart") transitionToMatch(message);
   else if (message.type === "snapshot") {
     playSnapshotEffects(latestSnapshot, message);
     latestSnapshot = message;
@@ -462,6 +418,7 @@ function renderLobby(lobby) {
   root.querySelector("#start-button")?.addEventListener("click", (event) => {
     event.currentTarget.disabled = true;
     event.currentTarget.classList.add("starting");
+    event.currentTarget.closest(".lobby-shell")?.classList.add("match-queued");
     event.currentTarget.querySelector("span").innerHTML = "<small>PREPARANDO</small>ABRINDO A ARENA";
     send({ type: "start" });
   });

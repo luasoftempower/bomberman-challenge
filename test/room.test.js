@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { makeCode, MATCH_DURATION_MS, Room, SUPER_MATCH_DURATION_MS } from "../server/room.js";
 
 class FakeSocket {
-  constructor() { this.readyState = 1; this.messages = []; }
+  constructor() { this.readyState = 1; this.bufferedAmount = 0; this.messages = []; }
   send(message) { this.messages.push(JSON.parse(message)); }
 }
 
@@ -86,7 +86,7 @@ test("the fixed-step clock catches up after a short server stall", () => {
   assert.equal(room.state.tick, 5);
 });
 
-test("snapshots are throttled below the simulation rate", () => {
+test("snapshots run at a smooth rate below the simulation rate", () => {
   const room = new Room("ABC234", "host-secret");
   const socket = new FakeSocket();
   const host = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
@@ -95,8 +95,21 @@ test("snapshots are throttled below the simulation rate", () => {
   for (let count = 0; count < 5; count += 1) room.tick(startAt + count * 25);
   const snapshots = socket.messages.filter((message) => message.type === "snapshot");
   assert.equal(room.state.tick, 5);
-  assert.equal(snapshots.length, 3);
-  assert.equal(snapshots.at(-1).networkRate, 20);
+  assert.equal(snapshots.length, 4);
+  assert.equal(snapshots.at(-1).networkRate, 30);
+});
+
+test("congested clients drop stale snapshots but still receive reliable events", () => {
+  const room = new Room("ABC234", "host-secret");
+  const socket = new FakeSocket();
+  const host = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
+  room.start(host.id);
+  socket.messages = [];
+  socket.bufferedAmount = 100_000;
+  room.tick(room.startsAt);
+  room.broadcast({ type: "host", hostId: host.id });
+  assert.equal(socket.messages.some((message) => message.type === "snapshot"), false);
+  assert.equal(socket.messages.some((message) => message.type === "host"), true);
 });
 
 test("returning from the result announces the lobby transition first", () => {
