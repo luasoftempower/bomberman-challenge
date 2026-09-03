@@ -30,6 +30,7 @@ const POWERUP_WEIGHTS = [
   ["fire", 22], ["bomb", 20], ["speed", 19], ["remote", 8], ["glove", 7],
   ["kick", 8], ["bombPass", 5], ["blockPass", 4], ["suit", 5], ["fullFire", 2],
 ];
+const TURN_BUFFER_TICKS = Math.ceil(TICK_RATE * 0.5);
 
 export function seededRandom(seed) {
   let value = (Number(seed) || 1) >>> 0;
@@ -87,6 +88,8 @@ export function createPlayer({ id, slot, name, kind = "human" }) {
     detonateLatch: false,
     specialLatch: false,
     moveTarget: null,
+    queuedDirection: null,
+    queuedDirectionUntilTick: 0,
     facing: slot === 0 || slot === 3 ? "right" : "left",
     maxBombs: MAX_BOMBS,
     fireRange: BLAST_RANGE,
@@ -198,17 +201,30 @@ function facingDirection(player) {
   return { x: 1, y: 0 };
 }
 
+function startPlayerMove(state, player, direction) {
+  if (!direction) return false;
+  player.facing = directionName(direction);
+  const currentX = Math.round(player.x / TILE_SIZE - 0.5);
+  const currentY = Math.round(player.y / TILE_SIZE - 0.5);
+  const tileX = currentX + direction.x;
+  const tileY = currentY + direction.y;
+  if (isTileBlocked(state, tileX, tileY, player, direction)) return false;
+  player.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+  return true;
+}
+
 function movePlayer(state, player, input) {
+  const freshIntent = cardinalDirection(input?.intent);
+  if (freshIntent) {
+    player.queuedDirection = freshIntent;
+    player.queuedDirectionUntilTick = state.tick + TURN_BUFFER_TICKS;
+  }
+  if (player.queuedDirectionUntilTick < state.tick) player.queuedDirection = null;
+
   if (!player.moveTarget) {
-    const direction = cardinalDirection(input);
-    if (!direction) return;
-    player.facing = directionName(direction);
-    const currentX = Math.round(player.x / TILE_SIZE - 0.5);
-    const currentY = Math.round(player.y / TILE_SIZE - 0.5);
-    const tileX = currentX + direction.x;
-    const tileY = currentY + direction.y;
-    if (isTileBlocked(state, tileX, tileY, player, direction)) return;
-    player.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+    const queued = player.queuedDirection;
+    if (queued && startPlayerMove(state, player, queued)) player.queuedDirection = null;
+    if (!player.moveTarget && !startPlayerMove(state, player, cardinalDirection(input))) return;
   }
 
   const dx = player.moveTarget.x - player.x;
@@ -458,6 +474,7 @@ export function step(state, inputs = {}) {
     if (!player.alive) continue;
     const input = inputs[player.id] || {};
     movePlayer(state, player, input);
+    if (input.intent) input.intent = null;
     collectPowerups(state, player);
     if (input.drop && !player.dropLatch) placeBomb(state, player);
     if (input.detonate && !player.detonateLatch) remoteDetonate(state, player);
@@ -485,7 +502,7 @@ export function snapshot(state) {
     tick: state.tick,
     mode: state.mode,
     grid: state.grid,
-    players: state.players.map(({ dropLatch, detonateLatch, specialLatch, invincibleUntilTick, ...player }) => ({
+    players: state.players.map(({ dropLatch, detonateLatch, specialLatch, invincibleUntilTick, queuedDirection, queuedDirectionUntilTick, ...player }) => ({
       ...player,
       protected: invincibleUntilTick > state.tick,
       protectionRemaining: Math.max(0, (invincibleUntilTick - state.tick) * TICK_SECONDS),

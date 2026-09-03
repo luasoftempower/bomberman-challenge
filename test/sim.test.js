@@ -100,6 +100,22 @@ test("movement is locked to one tile at a time with no diagonals", () => {
   assert.equal((player.x - TILE_SIZE / 2) % TILE_SIZE, 0);
 });
 
+test("a quick turn press is buffered until the player reaches the next tile", () => {
+  const state = baseState();
+  const player = state.players[0];
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+
+  step(state, { p1: { dx: 1, dy: 0 } });
+  for (let count = 0; count < 5; count += 1) step(state, { p1: { dx: 1, dy: 0 } });
+  step(state, { p1: { dx: 1, dy: 0, intent: { dx: 0, dy: 1 } } });
+  while (player.moveTarget?.tileX === 4) step(state, { p1: { dx: 1, dy: 0 } });
+
+  step(state, { p1: { dx: 1, dy: 0 } });
+  assert.equal(player.moveTarget?.tileX, 4);
+  assert.equal(player.moveTarget?.tileY, 4);
+});
+
 test("snapshots expose the accepted movement target for local prediction", () => {
   const state = baseState();
   const player = state.players[0];

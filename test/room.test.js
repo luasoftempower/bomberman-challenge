@@ -18,6 +18,27 @@ test("the fifth human receives ROOM_FULL", () => {
   assert.equal(fifth.error.code, "ROOM_FULL");
 });
 
+test("stale input packets cannot overwrite a newer direction", () => {
+  const room = new Room("ABC234", "host-secret");
+  const host = room.addHuman(new FakeSocket(), { name: "Host", hostToken: "host-secret" });
+  room.updateInput(host.id, { sequence: 2, dx: 0, dy: 1, direction: "down", directionSequence: 1 });
+  room.updateInput(host.id, { sequence: 1, dx: 1, dy: 0, direction: "right", directionSequence: 2 });
+  assert.equal(room.inputs[host.id].dx, 0);
+  assert.equal(room.inputs[host.id].dy, 1);
+  assert.deepEqual(room.inputs[host.id].intent, { dx: 0, dy: 1 });
+});
+
+test("a network direction intent is consumed by the simulation", () => {
+  const room = new Room("ABC234", "host-secret");
+  const host = room.addHuman(new FakeSocket(), { name: "Host", hostToken: "host-secret" });
+  room.start(host.id);
+  room.updateInput(host.id, { sequence: 1, dx: 0, dy: 0, direction: "right", directionSequence: 1 });
+  room.tick(room.startsAt);
+  const player = room.state.players.find((candidate) => candidate.id === host.id);
+  assert.equal(player.moveTarget?.tileX, 2);
+  assert(player.x > 1.5 * 40);
+});
+
 test("starting with two humans creates exactly two bots", () => {
   const room = new Room("ABC234", "host-secret");
   const host = room.addHuman(new FakeSocket(), { name: "Host", hostToken: "host-secret" });
@@ -54,6 +75,28 @@ test("the simulation waits for the animated match countdown", () => {
   assert.equal(room.state.tick, 0);
   room.tick(room.startsAt);
   assert.equal(room.state.tick, 1);
+});
+
+test("the fixed-step clock catches up after a short server stall", () => {
+  const room = new Room("ABC234", "host-secret");
+  const host = room.addHuman(new FakeSocket(), { name: "Host", hostToken: "host-secret" });
+  room.start(host.id);
+  room.tick(room.startsAt);
+  room.tick(room.nextSimulationAt + 75);
+  assert.equal(room.state.tick, 5);
+});
+
+test("snapshots are throttled below the simulation rate", () => {
+  const room = new Room("ABC234", "host-secret");
+  const socket = new FakeSocket();
+  const host = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
+  room.start(host.id);
+  const startAt = room.startsAt;
+  for (let count = 0; count < 5; count += 1) room.tick(startAt + count * 25);
+  const snapshots = socket.messages.filter((message) => message.type === "snapshot");
+  assert.equal(room.state.tick, 5);
+  assert.equal(snapshots.length, 3);
+  assert.equal(snapshots.at(-1).networkRate, 20);
 });
 
 test("returning from the result announces the lobby transition first", () => {

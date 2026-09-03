@@ -30,8 +30,11 @@ let lobbyMounted = false;
 let lastLobbyGameMode = null;
 let matchIntroTimers = [];
 let localInput = { dx: 0, dy: 0, drop: false, detonate: false, special: false };
+let latestSnapshotReceivedAt = 0;
+let estimatedRtt = 100;
+let latencyTimer = null;
 
-const LOCAL_PREDICTION_LEAD = 6;
+const MAX_PREDICTION_MS = 280;
 const WIN_SOUND_MUSIC_CUE_MS = 4150;
 const RESULT_BOARD_REVEAL_MS = 1250;
 const DRAW_BOARD_REVEAL_MS = 2800;
@@ -97,49 +100,68 @@ function predictionTileBlocked(state, self, tileX, tileY) {
   });
 }
 
-function updateLocalDisplay(current, target, state, elapsed) {
-  if (Math.abs(current.x - target.x) > TILE_SIZE || Math.abs(current.y - target.y) > TILE_SIZE) {
+function facingFor(direction, fallback = "down") {
+  if (direction?.x > 0) return "right";
+  if (direction?.x < 0) return "left";
+  if (direction?.y > 0) return "down";
+  if (direction?.y < 0) return "up";
+  return fallback;
+}
+
+function projectLocalPlayer(target, state, horizonMs) {
+  const projected = {
+    ...target,
+    moveTarget: target.moveTarget ? { ...target.moveTarget } : null,
+  };
+  let remaining = Math.max(0, horizonMs) / 1000;
+  let segments = 0;
+  while (remaining > 0.0001 && segments < 4) {
+    if (!projected.moveTarget) {
+      const direction = cardinalInput(localInput);
+      if (!direction) break;
+      const currentTileX = Math.round(projected.x / TILE_SIZE - 0.5);
+      const currentTileY = Math.round(projected.y / TILE_SIZE - 0.5);
+      const tileX = currentTileX + direction.x;
+      const tileY = currentTileY + direction.y;
+      if (predictionTileBlocked(state, projected, tileX, tileY)) break;
+      projected.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+      projected.facing = facingFor(direction, projected.facing);
+    }
+
+    const dx = projected.moveTarget.x - projected.x;
+    const dy = projected.moveTarget.y - projected.y;
+    const distance = Math.abs(dx) + Math.abs(dy);
+    const playerSpeed = projected.moveSpeed || MOVE_SPEED;
+    const availableTravel = playerSpeed * remaining;
+    if (availableTravel < distance) {
+      if (dx) projected.x += Math.sign(dx) * availableTravel;
+      else if (dy) projected.y += Math.sign(dy) * availableTravel;
+      break;
+    }
+    projected.x = projected.moveTarget.x;
+    projected.y = projected.moveTarget.y;
+    projected.moveTarget = null;
+    remaining -= distance / playerSpeed;
+    segments += 1;
+  }
+  return projected;
+}
+
+function updateLocalDisplay(current, target, state, elapsed, predictionMs) {
+  if (Math.abs(current.x - target.x) > TILE_SIZE * 1.5 || Math.abs(current.y - target.y) > TILE_SIZE * 1.5) {
     current.x = target.x;
     current.y = target.y;
   }
-
-  let direction = target.moveTarget
-    ? { x: Math.sign(target.moveTarget.x - target.x), y: Math.sign(target.moveTarget.y - target.y) }
-    : cardinalInput(localInput);
-  let limitX = target.moveTarget?.x;
-  let limitY = target.moveTarget?.y;
-
-  if (direction && !target.moveTarget) {
-    const currentTileX = Math.round(target.x / TILE_SIZE - 0.5);
-    const currentTileY = Math.round(target.y / TILE_SIZE - 0.5);
-    const tileX = currentTileX + direction.x;
-    const tileY = currentTileY + direction.y;
-    if (predictionTileBlocked(state, target, tileX, tileY)) direction = null;
-    else {
-      limitX = (tileX + 0.5) * TILE_SIZE;
-      limitY = (tileY + 0.5) * TILE_SIZE;
-    }
-  }
-
-  let goalX = target.x;
-  let goalY = target.y;
-  if (direction) {
-    goalX += direction.x * LOCAL_PREDICTION_LEAD;
-    goalY += direction.y * LOCAL_PREDICTION_LEAD;
-    if (direction.x > 0) goalX = Math.min(goalX, limitX);
-    if (direction.x < 0) goalX = Math.max(goalX, limitX);
-    if (direction.y > 0) goalY = Math.min(goalY, limitY);
-    if (direction.y < 0) goalY = Math.max(goalY, limitY);
-  }
-
-  const dx = goalX - current.x;
-  const dy = goalY - current.y;
+  const projected = projectLocalPlayer(target, state, predictionMs);
+  const dx = projected.x - current.x;
+  const dy = projected.y - current.y;
   const distance = Math.abs(dx) + Math.abs(dy);
   const playerSpeed = target.moveSpeed || MOVE_SPEED;
-  const speed = direction ? playerSpeed * 1.6 : playerSpeed * 3;
+  const speed = playerSpeed + Math.min(playerSpeed * 2, distance * 10);
   const travel = Math.min(speed * elapsed / 1000, distance);
   if (dx) current.x += Math.sign(dx) * travel;
   else if (dy) current.y += Math.sign(dy) * travel;
+  current.facing = projected.facing;
 }
 
 function startRenderLoop() {
@@ -152,17 +174,20 @@ function startRenderLoop() {
     if (canvas && latestSnapshot) {
       if (!displaySnapshot) displaySnapshot = copySnapshot(latestSnapshot);
       const smoothing = 1 - Math.exp(-elapsed * 0.028);
+      const snapshotAge = latestSnapshotReceivedAt ? now - latestSnapshotReceivedAt : 0;
+      const predictionMs = Math.min(MAX_PREDICTION_MS, Math.max(0, snapshotAge) + estimatedRtt / 2);
       const displayById = new Map(displaySnapshot.players.map((candidate) => [candidate.id, candidate]));
       const players = latestSnapshot.players.map((target) => {
         const current = displayById.get(target.id) || { ...target };
-        if (target.id === player?.playerId) updateLocalDisplay(current, target, latestSnapshot, elapsed);
+        if (target.id === player?.playerId) updateLocalDisplay(current, target, latestSnapshot, elapsed, predictionMs);
         else {
           current.x += (target.x - current.x) * smoothing;
           current.y += (target.y - current.y) * smoothing;
         }
         const displayX = current.x;
         const displayY = current.y;
-        Object.assign(current, target, { x: displayX, y: displayY });
+        const displayFacing = current.facing;
+        Object.assign(current, target, { x: displayX, y: displayY, facing: displayFacing });
         return current;
       });
       displaySnapshot = { ...latestSnapshot, players };
@@ -317,6 +342,8 @@ function renderLobbyReturnTransition(message) {
 }
 
 function connectToRoom(code, name, hostToken = null) {
+  clearInterval(latencyTimer);
+  latencyTimer = null;
   clearRoomTransition();
   lobbyMounted = false;
   roomTransitionStartedAt = performance.now();
@@ -326,10 +353,21 @@ function connectToRoom(code, name, hostToken = null) {
   socket = new WebSocket(`${protocol}//${location.host}/ws`);
   socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "join", roomCode: code, name, hostToken })));
   socket.addEventListener("message", (event) => handleMessage(JSON.parse(event.data)));
-  socket.addEventListener("close", () => { if (!errorShown && player) showToast("Conexão perdida. Atualize a página para voltar.", true); });
+  socket.addEventListener("close", () => {
+    clearInterval(latencyTimer);
+    latencyTimer = null;
+    if (!errorShown && player) showToast("Conexão perdida. Atualize a página para voltar.", true);
+  });
 }
 
 function send(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
+
+function startLatencyMonitoring() {
+  clearInterval(latencyTimer);
+  const ping = () => send({ type: "ping", clientTime: Date.now() });
+  ping();
+  latencyTimer = setInterval(ping, 2000);
+}
 
 function queueLobbyReveal(lobby) {
   if (!roomTransitionStartedAt) {
@@ -349,11 +387,20 @@ function queueLobbyReveal(lobby) {
 }
 
 function handleMessage(message) {
-  if (message.type === "joined") player = message;
+  if (message.type === "joined") { player = message; startLatencyMonitoring(); }
+  else if (message.type === "pong") {
+    const sample = Date.now() - Number(message.clientTime);
+    if (Number.isFinite(sample) && sample >= 0 && sample < 5000) estimatedRtt = estimatedRtt * 0.75 + sample * 0.25;
+  }
   else if (message.type === "lobbyReturn") renderLobbyReturnTransition(message);
   else if (message.type === "lobby") queueLobbyReveal(message);
   else if (message.type === "matchStart") renderMatch(message);
-  else if (message.type === "snapshot") { playSnapshotEffects(latestSnapshot, message); latestSnapshot = message; updateHud(message); }
+  else if (message.type === "snapshot") {
+    playSnapshotEffects(latestSnapshot, message);
+    latestSnapshot = message;
+    latestSnapshotReceivedAt = performance.now();
+    updateHud(message);
+  }
   else if (message.type === "matchEnd") renderResult(message.winnerSlot, message.standings || [], message.reason);
   else if (message.type === "host") player.isHost = message.hostId === player.playerId;
   else if (message.type === "error") renderError(message);
@@ -435,6 +482,7 @@ function renderMatch(start) {
   stopInput = null;
   localInput = { dx: 0, dy: 0, drop: false, detonate: false, special: false };
   latestSnapshot = { ...start, bombs: start.bombs || [], blasts: start.blasts || [], powerups: start.powerups || [], fallingBlocks: start.fallingBlocks || [] };
+  latestSnapshotReceivedAt = performance.now();
   displaySnapshot = copySnapshot(latestSnapshot);
   lastHudSignature = "";
   const countdownMs = Math.max(1200, Number(start.countdownMs) || 4420);

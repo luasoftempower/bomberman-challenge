@@ -5,6 +5,13 @@ import { createMatch, createSuddenDeathOrder, dropDeathBlock, snapshot, step } f
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MATCH_COUNTDOWN_MS = 4420;
+const NETWORK_RATE = 20;
+const SNAPSHOT_INTERVAL_TICKS = Math.max(1, Math.round(TICK_RATE / NETWORK_RATE));
+const MAX_CATCH_UP_STEPS = 8;
+const DIRECTION_VECTORS = {
+  left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
+  up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 },
+};
 export const MATCH_DURATION_MS = 90_000;
 export const SUPER_MATCH_DURATION_MS = 180_000;
 export const SUDDEN_DEATH_REMAINING_MS = 45_000;
@@ -33,6 +40,8 @@ export class Room {
     this.phase = "lobby";
     this.slots = Array.from({ length: ROOM_CAPACITY }, (_, slot) => ({ slot, kind: "empty" }));
     this.inputs = {};
+    this.inputSequences = {};
+    this.directionSequences = {};
     this.botPlans = {};
     this.state = null;
     this.startsAt = 0;
@@ -45,6 +54,8 @@ export class Room {
     this.suddenDeathQueue = [];
     this.nextDeathBlockAt = 0;
     this.emptySince = null;
+    this.nextSimulationAt = 0;
+    this.lastBroadcastTick = 0;
   }
 
   humanCount() {
@@ -62,6 +73,8 @@ export class Room {
     if (!this.hostId || hostToken === this.hostToken) this.hostId = id;
     this.emptySince = null;
     this.inputs[id] = { dx: 0, dy: 0, drop: false, detonate: false, special: false };
+    this.inputSequences[id] = -1;
+    this.directionSequences[id] = -1;
     this.trophies.set(id, 0);
     send(socket, { type: "joined", playerId: id, slot: open.slot, roomCode: this.code, isHost: id === this.hostId });
     this.broadcastLobby();
@@ -115,12 +128,23 @@ export class Room {
 
   updateInput(playerId, input) {
     if (!this.inputs[playerId]) return;
+    const sequence = Number.isSafeInteger(input.sequence) ? input.sequence : null;
+    if (sequence !== null && sequence <= (this.inputSequences[playerId] ?? -1)) return;
+    if (sequence !== null) this.inputSequences[playerId] = sequence;
+    const previous = this.inputs[playerId];
+    let intent = previous.intent || null;
+    const directionSequence = Number.isSafeInteger(input.directionSequence) ? input.directionSequence : null;
+    if (directionSequence !== null && directionSequence > (this.directionSequences[playerId] ?? -1)) {
+      this.directionSequences[playerId] = directionSequence;
+      intent = DIRECTION_VECTORS[input.direction] ? { ...DIRECTION_VECTORS[input.direction] } : intent;
+    }
     this.inputs[playerId] = {
       dx: [-1, 0, 1].includes(input.dx) ? input.dx : 0,
       dy: [-1, 0, 1].includes(input.dy) ? input.dy : 0,
       drop: Boolean(input.drop),
       detonate: Boolean(input.detonate),
       special: Boolean(input.special),
+      intent,
     };
   }
 
@@ -133,9 +157,13 @@ export class Room {
     const seed = randomBytes(4).readUInt32LE(0);
     this.state = createMatch(seed, this.slots.map(({ id, slot, name, kind }) => ({ id, slot, name, kind })), { mode: this.gameMode });
     this.inputs = Object.fromEntries(this.slots.map(({ id }) => [id, { dx: 0, dy: 0, drop: false, detonate: false, special: false }]));
+    this.inputSequences = Object.fromEntries(this.slots.map(({ id }) => [id, -1]));
+    this.directionSequences = Object.fromEntries(this.slots.map(({ id }) => [id, -1]));
     this.botPlans = {};
     this.phase = "playing";
     this.startsAt = Date.now() + MATCH_COUNTDOWN_MS;
+    this.nextSimulationAt = this.startsAt;
+    this.lastBroadcastTick = 0;
     const durationMs = this.gameMode === GAME_MODES.SUPER ? SUPER_MATCH_DURATION_MS : MATCH_DURATION_MS;
     this.endsAt = this.startsAt + durationMs;
     this.suddenDeathQueue = this.gameMode === GAME_MODES.SUPER ? createSuddenDeathOrder(this.state.grid) : [];
@@ -156,6 +184,7 @@ export class Room {
     }
     this.phase = "lobby";
     this.startsAt = 0;
+    this.nextSimulationAt = 0;
     this.endsAt = 0;
     this.endReason = null;
     this.suddenDeathQueue = [];
@@ -185,30 +214,46 @@ export class Room {
           scheduledThisTick += 1;
         }
       }
-      const reservedBotDestinations = new Set();
-      for (const slot of this.slots) {
-        if (slot.kind !== "bot") continue;
-        const currentPlan = this.botPlans[slot.id];
-        const botPlayer = this.state.players.find((player) => player.id === slot.id);
-        const reachedTileCenter = !botPlayer?.moveTarget;
-        if (!currentPlan || (reachedTileCenter && now >= currentPlan.nextAt)) {
-          const decision = decideBotInput(this.state, slot.id, reservedBotDestinations);
-          const profile = BOT_PROFILES[this.botDifficulty] || BOT_PROFILES.normal;
-          const canDrop = this.botDifficulty !== "easy" || (this.state.tick + slot.slot) % 3 === 0;
-          this.inputs[slot.id] = decision.input.drop && !canDrop ? { ...decision.input, drop: false } : decision.input;
-          const delay = decision.urgent ? profile.urgentDelay : profile.minDelay + Math.random() * (profile.maxDelay - profile.minDelay);
-          this.botPlans[slot.id] = { path: decision.path, nextAt: now + delay };
+      const stepDuration = 1000 / TICK_RATE;
+      if (!this.nextSimulationAt) this.nextSimulationAt = now;
+      // Recover short event-loop stalls without allowing an unbounded catch-up spiral.
+      this.nextSimulationAt = Math.max(this.nextSimulationAt, now - stepDuration * (MAX_CATCH_UP_STEPS - 1));
+      let simulated = 0;
+      while (now + 0.01 >= this.nextSimulationAt && simulated < MAX_CATCH_UP_STEPS && this.state.status === "playing") {
+        const simulationNow = this.nextSimulationAt;
+        const reservedBotDestinations = new Set();
+        for (const slot of this.slots) {
+          if (slot.kind !== "bot") continue;
+          const currentPlan = this.botPlans[slot.id];
+          const botPlayer = this.state.players.find((player) => player.id === slot.id);
+          const reachedTileCenter = !botPlayer?.moveTarget;
+          if (!currentPlan || (reachedTileCenter && simulationNow >= currentPlan.nextAt)) {
+            const decision = decideBotInput(this.state, slot.id, reservedBotDestinations);
+            const profile = BOT_PROFILES[this.botDifficulty] || BOT_PROFILES.normal;
+            const canDrop = this.botDifficulty !== "easy" || (this.state.tick + slot.slot) % 3 === 0;
+            this.inputs[slot.id] = decision.input.drop && !canDrop ? { ...decision.input, drop: false } : decision.input;
+            const delay = decision.urgent ? profile.urgentDelay : profile.minDelay + Math.random() * (profile.maxDelay - profile.minDelay);
+            this.botPlans[slot.id] = { path: decision.path, nextAt: simulationNow + delay };
+          }
+          const nextTile = this.botPlans[slot.id]?.path?.[0];
+          if (nextTile) reservedBotDestinations.add(`${nextTile.x},${nextTile.y}`);
         }
-        const nextTile = this.botPlans[slot.id]?.path?.[0];
-        if (nextTile) reservedBotDestinations.add(`${nextTile.x},${nextTile.y}`);
-      }
 
-      step(this.state, this.inputs);
+        step(this.state, this.inputs);
+        simulated += 1;
+        this.nextSimulationAt += stepDuration;
+      }
       if (this.state.status === "ended") this.endReason = "elimination";
     }
 
     const remainingMs = Math.max(0, this.endsAt - now);
-    this.broadcast({ type: "snapshot", ...snapshot(this.state), remainingMs });
+    const snapshotDue = this.state.tick === 1
+      || this.state.tick - this.lastBroadcastTick >= SNAPSHOT_INTERVAL_TICKS
+      || this.state.status === "ended";
+    if (snapshotDue) {
+      this.broadcast({ type: "snapshot", ...snapshot(this.state), remainingMs, serverTime: now, networkRate: NETWORK_RATE });
+      this.lastBroadcastTick = this.state.tick;
+    }
     if (this.state.status === "ended" && !this.endAnnounced) {
       this.phase = "ended";
       this.endAnnounced = true;
@@ -231,6 +276,8 @@ export class Room {
       const slotNumber = slot.slot;
       this.slots[slotNumber] = { slot: slotNumber, kind: "empty" };
       delete this.inputs[playerId];
+      delete this.inputSequences[playerId];
+      delete this.directionSequences[playerId];
     }
 
     if (this.hostId === playerId) {

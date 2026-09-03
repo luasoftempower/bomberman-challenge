@@ -64,6 +64,11 @@ webSockets.on("connection", (socket) => {
       return socket.close(1003, "Invalid JSON");
     }
 
+    if (message.type === "ping") {
+      if (socket.readyState === 1) socket.send(JSON.stringify({ type: "pong", clientTime: message.clientTime, serverTime: Date.now() }));
+      return;
+    }
+
     if (!playerId) {
       if (message.type !== "join") return socket.close(1008, "Join required");
       room = rooms.get(String(message.roomCode || "").toUpperCase());
