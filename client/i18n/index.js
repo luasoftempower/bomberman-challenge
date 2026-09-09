@@ -1,70 +1,53 @@
-// Importa os arquivos que contêm os textos traduzidos para Português e Inglês.
-// Cada arquivo possui um conjunto de chaves e suas respectivas traduções.
+// importa os arquivos onde ficam as traduções em português e inglês
 import pt from "./pt.js";
 import en from "./en.js";
 
 
-// Define a chave utilizada para salvar no navegador o idioma escolhido pelo usuário.
-// Essa informação será armazenada no localStorage.
+// essa chave é usada no localStorage pra salvar o idioma que o usuário escolheu
+// assim, quando ele entrar no site de novo, o idioma continua o mesmo
 export const STORAGE_KEY = "blast-language";
 
 
-// Reúne todos os idiomas disponíveis no sistema.
-// "pt" representa Português e "en" representa Inglês.
+// aqui ficam os idiomas que o sistema aceita
+// cada idioma aponta pro arquivo que tem as traduções dele
 export const dictionaries = { pt, en };
 
 
-// Define Português como idioma padrão da aplicação.
-// Caso o usuário já tenha escolhido outro idioma anteriormente,
-// esse valor poderá ser alterado pelo bloco abaixo.
+// começa usando português como padrão
+// esse valor pode mudar depois caso tenha algum idioma salvo no navegador
 let language = "pt";
 
 
-// ======================================================
-// RECUPERA O IDIOMA SALVO NO NAVEGADOR
-// ======================================================
-
-// Tenta verificar se o usuário já escolheu um idioma anteriormente.
-// Caso exista uma preferência salva no localStorage,
-// ela será usada como idioma inicial.
-//
-// O try/catch evita que a aplicação apresente erro caso o navegador
-// bloqueie ou não permita o acesso ao localStorage.
+// tenta pegar o idioma que já estava salvo no navegador
+// se o usuário já tiver trocado pra inglês antes, por exemplo,
+// ele não precisa escolher de novo toda vez que abrir o site
 try {
   const saved = globalThis.localStorage?.getItem(STORAGE_KEY);
 
-  // Verifica se o idioma salvo realmente existe no objeto de traduções.
-  // Isso impede que valores inválidos sejam usados.
+  // verifica se o valor salvo realmente é um idioma que existe
+  // isso evita colocar qualquer valor inválido dentro de language
   if (Object.hasOwn(dictionaries, saved)) {
     language = saved;
   }
+
 } catch {
-  // Caso não seja possível acessar o armazenamento,
-  // o Português continuará sendo utilizado como padrão.
+  // se o navegador bloquear o localStorage ou der algum erro,
+  // simplesmente continua usando português
 }
 
 
-// ======================================================
-// RETORNA O IDIOMA ATUAL
-// ======================================================
-
-// Essa função simplesmente informa qual idioma está ativo no momento.
-// Pode retornar, por exemplo, "pt" ou "en".
+// essa função retorna qual idioma está sendo usado no momento
+// pode ser útil em outras partes do código que precisem saber se está em pt ou en
 export const getLanguage = () => language;
 
 
-// ======================================================
-// PROTEÇÃO DE TEXTO HTML
-// ======================================================
-
-// Essa função transforma caracteres especiais em entidades HTML.
+// essa função serve pra tratar caracteres especiais antes de colocar textos no HTML
+// isso evita que coisas como <, > ou aspas sejam interpretadas como código HTML
 //
-// Isso é importante quando algum texto será inserido dentro do HTML,
-// pois evita que caracteres como <, >, " e ' sejam interpretados
-// como parte do código HTML.
+// por exemplo:
+// <teste> vira &lt;teste&gt;
 //
-// Exemplo:
-// "<teste>" será transformado em "&lt;teste&gt;".
+// além de evitar problemas no HTML, isso também ajuda na segurança
 export const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (character) =>
     ({
@@ -77,36 +60,31 @@ export const escapeHtml = (value) =>
   );
 
 
-// ======================================================
-// FUNÇÃO PRINCIPAL DE TRADUÇÃO
-// ======================================================
-
-// A função t() recebe uma chave de tradução e retorna o texto
-// correspondente ao idioma atualmente selecionado.
+// essa é a função principal da tradução
 //
-// Exemplo:
-// t("app.title")
+// ela recebe uma chave, procura essa chave no idioma atual
+// e retorna o texto correspondente
 //
-// Caso a tradução não exista no idioma atual,
-// ela tenta utilizar a tradução em Português.
-// Se também não existir em Português, retorna a própria chave.
+// exemplo:
+// t("menu.play")
 //
-// O parâmetro "params" permite inserir valores dentro da tradução.
+// se o idioma estiver em português, pode retornar "Jogar"
+// se estiver em inglês, pode retornar "Play"
 //
-// Exemplo de tradução:
-// "player.score": "{name} fez {score} pontos"
-//
-// Uso:
-// t("player.score", { name: "Davi", score: 10 })
-//
-// Resultado:
-// "Davi fez 10 pontos"
+// o params serve pra colocar valores dentro de uma tradução
+// por exemplo: "Jogador {name} entrou na partida"
 export function t(key, params = {}) {
+
+  // primeiro tenta pegar a tradução no idioma atual
+  // se não existir, tenta pegar em português
+  // se ainda assim não existir, mostra a própria chave
   const message =
     dictionaries[language][key] ??
     pt[key] ??
     key;
 
+  // procura valores entre chaves, tipo {name}, {score}, {count}
+  // e substitui pelo valor que foi passado em params
   return message.replace(/\{(\w+)\}/g, (placeholder, name) =>
     Object.hasOwn(params, name)
       ? String(params[name])
@@ -115,24 +93,18 @@ export function t(key, params = {}) {
 }
 
 
-// ======================================================
-// CRIA UM TEXTO TRADUZÍVEL NO HTML
-// ======================================================
-
-// Essa função cria uma tag <i18n-text> contendo informações
-// sobre qual chave de tradução está sendo utilizada.
+// essa função é usada quando eu quero colocar um texto traduzível no HTML
 //
-// Isso permite que o texto seja atualizado depois,
-// quando o usuário trocar o idioma,
-// sem precisar recriar toda a interface.
+// além de mostrar a tradução atual, ela salva a chave em data-i18n
+// assim, quando o idioma mudar, o sistema sabe qual texto precisa atualizar
 //
-// Exemplo:
+// exemplo:
 // text("menu.play")
 //
-// Pode gerar algo parecido com:
-//
+// gera algo parecido com:
 // <i18n-text data-i18n="menu.play">Jogar</i18n-text>
 export function text(key, params = {}) {
+
   return `<i18n-text
     data-i18n="${escapeHtml(key)}"
     data-i18n-params="${escapeHtml(JSON.stringify(params))}"
@@ -140,26 +112,19 @@ export function text(key, params = {}) {
 }
 
 
-// ======================================================
-// CRIA ATRIBUTOS HTML TRADUZÍVEIS
-// ======================================================
-
-// Essa função é utilizada quando a tradução não está no texto
-// visível do elemento, mas sim em algum atributo.
+// essa função tem uma ideia parecida com a função text(),
+// mas ela é usada pra traduzir atributos de elementos HTML
 //
-// Pode ser usada, por exemplo, para:
+// por exemplo:
 //
+// placeholder de um input
+// title de um botão
 // aria-label
-// title
-// placeholder
-// content
 //
-// Ela também adiciona informações data-i18n para permitir que
-// o atributo seja atualizado automaticamente quando o idioma mudar.
-//
-// Exemplo:
-// attr("placeholder", "input.name")
+// ela também salva a chave da tradução em um data-i18n
+// pra conseguir atualizar depois quando o idioma mudar
 export function attr(attribute, key, params = {}) {
+
   return `${attribute}="${escapeHtml(t(key, params))}"
     data-i18n-${attribute}="${escapeHtml(key)}"
     data-i18n-${attribute}-params="${escapeHtml(
@@ -168,59 +133,48 @@ export function attr(attribute, key, params = {}) {
 }
 
 
-// ======================================================
-// ALTERA UM TEXTO DINÂMICO
-// ======================================================
-
-// Essa função serve principalmente para textos que mudam durante
-// a execução do jogo.
+// essa função é usada pra alterar textos que mudam durante o jogo
 //
-// Exemplos:
+// por exemplo:
 //
-// contagem regressiva
-// mensagens de erro
-// status da partida
-// quantidade de jogadores
 // pontuação
+// mensagens de erro
+// quantidade de jogadores
+// contagem regressiva
+// status da partida
 //
-// Além de modificar o texto do elemento,
-// ela salva a chave da tradução no dataset.
-// Dessa forma, o texto também será atualizado caso
-// o usuário mude o idioma depois.
+// ela não muda só o texto.
+// também guarda qual tradução está sendo usada naquele elemento,
+// então se o jogador trocar de idioma depois, esse texto também muda
 export function setText(element, key, params = {}) {
-  // Caso o elemento não exista, a função é encerrada.
+
+  // se o elemento não existir, para a função aqui
+  // isso evita erro tentando mexer em um elemento inexistente
   if (!element) return;
 
-  // Guarda a chave da tradução.
+  // salva qual chave de tradução esse elemento está usando
   element.dataset.i18n = key;
 
-  // Guarda os parâmetros utilizados na tradução.
+  // salva também os parâmetros usados na tradução
   element.dataset.i18nParams = JSON.stringify(params);
 
-  // Atualiza o conteúdo exibido para o usuário.
+  // coloca o texto traduzido no elemento
   element.textContent = t(key, params);
 }
 
 
-// ======================================================
-// APLICA AS TRADUÇÕES NA PÁGINA
-// ======================================================
-
-// Essa função percorre os elementos da página procurando
-// aqueles que possuem informações de tradução.
+// essa função é responsável por atualizar as traduções da página inteira
 //
-// Ela atualiza tanto textos comuns quanto atributos,
-// como title, placeholder e aria-label.
+// normalmente ela é chamada quando o usuário troca de idioma
 //
-// Essa função é chamada sempre que o idioma é alterado,
-// permitindo mudar Português/Inglês sem recarregar a página.
+// em vez de precisar recriar todo o menu, lobby ou HUD,
+// ela procura os elementos que têm data-i18n e troca apenas os textos
 export function applyTranslations(scope = document) {
 
-  // ------------------------------------------------------
-  // Atualiza textos dos elementos que possuem data-i18n.
-  // ------------------------------------------------------
-
+  // procura todos os elementos que tenham data-i18n
+  // e atualiza o conteúdo de texto de cada um
   for (const element of scope.querySelectorAll("[data-i18n]")) {
+
     element.textContent = t(
       element.dataset.i18n,
       JSON.parse(element.dataset.i18nParams || "{}")
@@ -228,11 +182,10 @@ export function applyTranslations(scope = document) {
   }
 
 
-  // ------------------------------------------------------
-  // Atualiza atributos que também possuem tradução.
-  // ------------------------------------------------------
-
-  // Lista de atributos que podem conter textos traduzíveis.
+  // alguns textos não ficam dentro do elemento,
+  // ficam em atributos como placeholder ou title
+  //
+  // então aqui eu percorro esses atributos separadamente
   for (const attribute of [
     "aria-label",
     "title",
@@ -240,26 +193,27 @@ export function applyTranslations(scope = document) {
     "content",
   ]) {
 
-    // Procura elementos que utilizam tradução naquele atributo.
+    // procura os elementos que possuem tradução nesse atributo
     for (
       const element of scope.querySelectorAll(
         `[data-i18n-${attribute}]`
       )
     ) {
 
-      // Recupera a chave da tradução.
+      // pega qual chave de tradução está salva
       const key = element.getAttribute(
         `data-i18n-${attribute}`
       );
 
-      // Recupera possíveis parâmetros usados na tradução.
+      // pega os parâmetros que foram salvos
+      // se não tiver nenhum, usa um objeto vazio
       const params = JSON.parse(
         element.getAttribute(
           `data-i18n-${attribute}-params`
         ) || "{}"
       );
 
-      // Atualiza o atributo com a tradução correta.
+      // atualiza o atributo com a tradução do idioma atual
       element.setAttribute(
         attribute,
         t(key, params)
@@ -268,114 +222,96 @@ export function applyTranslations(scope = document) {
   }
 
 
-  // ------------------------------------------------------
-  // Atualiza o idioma informado no próprio HTML.
-  // ------------------------------------------------------
-
-  // Isso é útil para navegadores, mecanismos de busca
-  // e ferramentas de acessibilidade.
+  // muda o atributo lang da página
+  // isso ajuda o navegador e também leitores de tela
+  // a entender qual idioma está sendo usado
   document.documentElement.lang =
     language === "pt"
       ? "pt-BR"
       : "en";
 
 
-  // ------------------------------------------------------
-  // Atualiza o título da página.
-  // ------------------------------------------------------
-
+  // muda também o título que aparece na aba do navegador
   document.title = t("app.title");
 
 
-  // ------------------------------------------------------
-  // Atualiza os botões responsáveis pela troca de idioma.
-  // ------------------------------------------------------
-
+  // procura os botões usados pra trocar de idioma
+  // e atualiza eles também
   for (
     const button of scope.querySelectorAll(
       "[data-language-toggle]"
     )
   ) {
 
-    // Atualiza bandeira, nome do idioma e outros elementos.
+    // atualiza bandeira e nome do idioma
     button.innerHTML = flagMarkup();
 
-    // Atualiza informações usadas por leitores de tela.
+    // atualiza o texto usado por acessibilidade
     button.setAttribute(
       "aria-label",
       t("language.toggle")
     );
 
-    // Atualiza o texto exibido ao passar o mouse.
+    // atualiza o texto que aparece quando passa o mouse por cima
     button.title = t("language.toggle");
   }
 }
 
 
-// ======================================================
-// TROCA O IDIOMA DA APLICAÇÃO
-// ======================================================
-
-// Essa função recebe o código do novo idioma,
-// como "pt" ou "en".
+// essa função é usada quando o usuário realmente troca o idioma
 //
-// Ela verifica se o idioma existe,
-// salva a preferência no navegador
-// e atualiza toda a página.
+// recebe "pt" ou "en",
+// atualiza a variável language,
+// salva no navegador e depois atualiza os textos da tela
 export function setLanguage(nextLanguage) {
 
-  // Verifica se o idioma solicitado está disponível.
+  // verifica primeiro se esse idioma existe
+  // se alguém tentar passar um idioma inválido, não faz a troca
   if (!Object.hasOwn(dictionaries, nextLanguage)) {
     return false;
   }
 
-  // Atualiza o idioma atual.
+  // atualiza o idioma atual
   language = nextLanguage;
 
 
-  // ------------------------------------------------------
-  // Salva a preferência no navegador.
-  // ------------------------------------------------------
-
+  // tenta salvar a preferência do usuário no navegador
+  // assim ela continua salva mesmo depois de fechar a página
   try {
+
     globalThis.localStorage?.setItem(
       STORAGE_KEY,
       language
     );
+
   } catch {
-    // Caso o localStorage esteja bloqueado,
-    // a troca de idioma ainda funcionará durante a sessão.
+
+    // se não conseguir salvar no localStorage,
+    // o idioma ainda funciona normalmente enquanto a página estiver aberta
   }
 
 
-  // ------------------------------------------------------
-  // Atualiza os textos da página.
-  // ------------------------------------------------------
-
-  // A verificação evita erros caso esse arquivo seja executado
-  // em um ambiente onde "document" não existe.
+  // só tenta atualizar a página se o código estiver rodando no navegador
+  // isso evita erro em ambientes onde document não existe
   if (typeof document !== "undefined") {
     applyTranslations();
   }
 
+  // retorna true pra indicar que a troca deu certo
   return true;
 }
 
 
-// ======================================================
-// MONTA O CONTEÚDO VISUAL DO BOTÃO DE IDIOMA
-// ======================================================
-
-// Essa função gera o HTML utilizado dentro do botão
-// responsável pela troca de idioma.
+// essa função monta a parte de dentro do botão de idioma
 //
-// Ela mostra:
+// ela escolhe qual bandeira mostrar dependendo do idioma atual
 //
-// - Bandeira do Brasil quando o idioma é Português.
-// - Bandeira dos Estados Unidos quando o idioma é Inglês.
-// - Nome do idioma atual.
-// - Símbolo indicando que é possível realizar a troca.
+// português = bandeira do Brasil
+// inglês = bandeira dos Estados Unidos
+//
+// também mostra o nome do idioma e a setinha de troca
 function flagMarkup() {
+
   return `
     <img
       src="/flags/${language === "pt" ? "br" : "us"}.svg"
@@ -404,17 +340,12 @@ function flagMarkup() {
 }
 
 
-// ======================================================
-// CRIA O BOTÃO DE TROCA DE IDIOMA
-// ======================================================
-
-// Essa função retorna todo o HTML do botão utilizado
-// para trocar o idioma da aplicação.
+// essa função cria o botão completo usado pra trocar o idioma
 //
-// O atributo "data-language-toggle" é utilizado posteriormente
-// pelo JavaScript para identificar quando o usuário clicou
-// no botão de idioma.
+// data-language-toggle é importante porque é através dele
+// que o código identifica que esse botão serve pra mudar a linguagem
 export function languageButton() {
+
   return `
     <button
       class="settings-menu-item language-toggle"
@@ -429,49 +360,40 @@ export function languageButton() {
 }
 
 
-// ======================================================
-// INICIALIZA TODO O SISTEMA DE IDIOMAS
-// ======================================================
-
-// Essa função deve ser chamada quando a aplicação iniciar.
+// essa função inicia o sistema de idiomas
 //
-// Ela realiza três tarefas principais:
+// ela deve ser chamada quando o jogo/site estiver iniciando
 //
-// 1. Aplica as traduções iniciais.
-// 2. Configura o botão para trocar entre Português e Inglês.
-// 3. Sincroniza o idioma entre diferentes abas do navegador.
+// basicamente ela:
+//
+// 1 - aplica as traduções atuais
+// 2 - faz o botão de idioma funcionar
+// 3 - sincroniza o idioma entre abas diferentes
 export function initializeLanguage() {
 
-  // ------------------------------------------------------
-  // Aplica as traduções no momento em que o sistema inicia.
-  // ------------------------------------------------------
-
+  // já aplica a tradução certa assim que inicia
   applyTranslations();
 
 
-  // ------------------------------------------------------
-  // DETECTA CLIQUES NO BOTÃO DE IDIOMA
-  // ------------------------------------------------------
-
-  // É utilizada delegação de eventos.
+  // aqui eu uso um evento de clique no document inteiro
   //
-  // Em vez de colocar um evento diretamente em cada botão,
-  // o clique é detectado pelo document.
+  // fiz dessa forma porque alguns elementos do jogo podem ser
+  // criados e removidos várias vezes, como lobby, HUD e menus
   //
-  // Isso é útil porque menus, lobby e HUD podem ser
-  // destruídos e recriados durante a execução do jogo.
+  // se colocasse o evento diretamente no botão,
+  // ele poderia parar de funcionar quando o botão fosse recriado
   document.addEventListener("click", (event) => {
 
-    // Verifica se o clique aconteceu dentro de algum elemento
-    // que possua o atributo data-language-toggle.
+    // verifica se o elemento clicado ou algum elemento acima dele
+    // possui o atributo data-language-toggle
     if (
       event.target.closest(
         "[data-language-toggle]"
       )
     ) {
 
-      // Se estiver em Português, muda para Inglês.
-      // Se estiver em Inglês, muda para Português.
+      // se estiver em português, muda pra inglês
+      // se estiver em inglês, volta pra português
       setLanguage(
         language === "pt"
           ? "en"
@@ -481,23 +403,19 @@ export function initializeLanguage() {
   });
 
 
-  // ------------------------------------------------------
-  // SINCRONIZA O IDIOMA ENTRE ABAS DO NAVEGADOR
-  // ------------------------------------------------------
-
-  // O evento "storage" é disparado quando o localStorage
-  // é alterado em outra aba do mesmo site.
+  // esse evento serve pra sincronizar o idioma entre abas
   //
-  // Dessa forma, se o usuário trocar o idioma em uma aba,
-  // as outras abas também acompanham a alteração.
+  // por exemplo:
+  // se tiver o jogo aberto em duas abas e mudar o idioma em uma,
+  // a outra também vai perceber a alteração
   window.addEventListener("storage", (event) => {
 
-    // Verifica se a informação alterada foi justamente
-    // a preferência de idioma.
+    // verifica se o valor alterado no localStorage
+    // foi justamente o idioma
     if (event.key === STORAGE_KEY) {
 
-      // Usa o novo idioma salvo.
-      // Caso o valor seja removido, volta para Português.
+      // coloca o novo idioma
+      // se o valor tiver sido apagado, volta pra português
       setLanguage(
         event.newValue || "pt"
       );
