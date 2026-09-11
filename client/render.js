@@ -1,4 +1,4 @@
-import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, PLAYER_COLORS, TILE_SIZE, WALL } from "../shared/constants.js";
+import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
 
 const px = (context, color, x, y, width, height) => {
   context.fillStyle = color;
@@ -198,6 +198,10 @@ const CHARACTER_PALETTES = [
   { helmet: "#171a2a", suit: "#20243a", accent: "#c8ff50", gloves: "#ff8bb4", boots: "#e84d91" },
   { helmet: "#2e68d7", suit: "#3476e8", accent: "#55dff7", gloves: "#ff8bb4", boots: "#e94c91" },
   { helmet: "#ed5037", suit: "#f15c3d", accent: "#ffd24d", gloves: "#ff9bad", boots: "#d93657" },
+  { helmet: "#f0c83f", suit: "#d9a629", accent: "#fff173", gloves: "#ff9bad", boots: "#9a6a12" },
+  { helmet: "#ec873d", suit: "#d66d27", accent: "#ffd0a2", gloves: "#ff9bad", boots: "#974319" },
+  { helmet: "#48c982", suit: "#2fa868", accent: "#b8ffce", gloves: "#ff9bad", boots: "#19764a" },
+  { helmet: "#df79de", suit: "#bc54bd", accent: "#ffd2ff", gloves: "#ff9bad", boots: "#813482" },
 ];
 
 function shade(color, amount) {
@@ -594,9 +598,10 @@ export function renderGame(canvas, state) {
       const tile = grid[y * BOARD_WIDTH + x];
       const left = x * TILE_SIZE;
       const top = y * TILE_SIZE;
+      if (tile === VOID) continue;
       drawFloor(context, left, top, x, y);
       if (tile === WALL) {
-        const border = x === 0 || y === 0 || x === BOARD_WIDTH - 1 || y === BOARD_HEIGHT - 1;
+        const border = state.arenaType === "hexagon" || x === 0 || y === 0 || x === BOARD_WIDTH - 1 || y === BOARD_HEIGHT - 1;
         drawWall(context, left, top, border);
       } else if (tile === CRATE) {
         drawCrate(context, left, top);
@@ -606,7 +611,7 @@ export function renderGame(canvas, state) {
   for (const powerup of state.powerups || []) drawPowerup(context, powerup, animationTime);
   for (const blast of state.blasts || []) drawBlast(context, blast, animationTime);
   for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
-  for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot], animationTime);
+  for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
   for (const block of state.fallingBlocks || []) drawFallingBlock(context, block, animationTime);
 }
 

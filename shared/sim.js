@@ -17,14 +17,15 @@ import {
   MAX_MOVE_SPEED,
   MOVE_SPEED,
   POWERUP_DROP_CHANCE,
-  SPAWNS,
   SPEED_UP_AMOUNT,
   SUIT_SECONDS,
   TICK_RATE,
   TICK_SECONDS,
   TILE_SIZE,
+  VOID,
   WALL,
 } from "./constants.js";
+import { ARENA_TYPES, arenaTypeForPlayerCount, isArenaBoundary, isInsideArena, spawnsForArena } from "./arena.js";
 
 const POWERUP_WEIGHTS = [
   ["fire", 22], ["bomb", 20], ["speed", 19], ["remote", 8], ["glove", 7],
@@ -44,7 +45,10 @@ export function seededRandom(seed) {
 }
 
 export const indexOf = (x, y) => y * BOARD_WIDTH + x;
-export const tileAt = (grid, x, y) => grid[indexOf(x, y)];
+export const tileAt = (grid, x, y) => {
+  if (x < 0 || y < 0 || x >= BOARD_WIDTH || y >= BOARD_HEIGHT) return undefined;
+  return grid[indexOf(x, y)];
+};
 
 function setTile(state, x, y, value) {
   const position = indexOf(x, y);
@@ -54,31 +58,38 @@ function setTile(state, x, y, value) {
   state.grid = mutable.join("");
 }
 
-export function createGrid(seed = Date.now()) {
+export function createGrid(seed = Date.now(), { arenaType = ARENA_TYPES.SQUARE } = {}) {
   const random = seededRandom(seed);
-  const grid = Array(BOARD_WIDTH * BOARD_HEIGHT).fill(EMPTY);
+  const grid = Array(BOARD_WIDTH * BOARD_HEIGHT).fill(VOID);
   const clear = new Set();
   const crateChance = 0.64 + random() * 0.18;
+  const spawns = spawnsForArena(arenaType);
 
-  for (const spawn of SPAWNS) {
+  for (const spawn of spawns) {
     clear.add(`${spawn.x},${spawn.y}`);
-    clear.add(`${spawn.x + (spawn.x === 1 ? 1 : -1)},${spawn.y}`);
-    clear.add(`${spawn.x},${spawn.y + (spawn.y === 1 ? 1 : -1)}`);
+    for (const direction of DIRECTIONS) {
+      const x = spawn.x + direction.x;
+      const y = spawn.y + direction.y;
+      if (isInsideArena(arenaType, x, y)) clear.add(`${x},${y}`);
+    }
   }
 
   for (let y = 0; y < BOARD_HEIGHT; y += 1) {
     for (let x = 0; x < BOARD_WIDTH; x += 1) {
-      const border = x === 0 || y === 0 || x === BOARD_WIDTH - 1 || y === BOARD_HEIGHT - 1;
-      const pillar = x % 2 === 0 && y % 2 === 0;
+      if (!isInsideArena(arenaType, x, y)) continue;
+      const border = isArenaBoundary(arenaType, x, y);
+      const pillar = !border && x % 2 === 0 && y % 2 === 0;
       if (border || pillar) grid[indexOf(x, y)] = WALL;
       else if (!clear.has(`${x},${y}`) && random() < crateChance) grid[indexOf(x, y)] = CRATE;
+      else grid[indexOf(x, y)] = EMPTY;
     }
   }
   return grid.join("");
 }
 
-export function createPlayer({ id, slot, name, kind = "human" }) {
-  const spawn = SPAWNS[slot];
+export function createPlayer({ id, slot, name, kind = "human" }, arenaType = ARENA_TYPES.SQUARE) {
+  const spawn = spawnsForArena(arenaType)[slot];
+  if (!spawn) throw new Error(`No spawn configured for slot ${slot} in ${arenaType} arena`);
   return {
     id, slot, name, kind,
     x: (spawn.x + 0.5) * TILE_SIZE,
@@ -104,12 +115,14 @@ export function createPlayer({ id, slot, name, kind = "human" }) {
 }
 
 export function createMatch(seed, slots, { mode = GAME_MODES.CLASSIC } = {}) {
+  const arenaType = arenaTypeForPlayerCount(slots.length);
   return {
     tick: 0,
     seed,
     mode,
-    grid: createGrid(seed),
-    players: slots.map(createPlayer),
+    arenaType,
+    grid: createGrid(seed, { arenaType }),
+    players: slots.map((slot) => createPlayer(slot, arenaType)),
     bombs: [],
     blasts: [],
     powerups: [],
@@ -160,7 +173,7 @@ function tryKickBomb(state, player, bomb, direction) {
 
 function isTileBlocked(state, x, y, movingPlayer, direction = null) {
   const tile = tileAt(state.grid, x, y);
-  if (tile === WALL || tile === undefined) return true;
+  if (tile === WALL || tile === VOID || tile === undefined) return true;
   if (tile === CRATE && !movingPlayer.blockPass) return true;
   const bomb = bombAt(state, x, y);
   if (bomb && !movingPlayer.bombPass) {
@@ -313,7 +326,7 @@ function blastTiles(state, bomb) {
       const x = bomb.x + direction.x * distance;
       const y = bomb.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
-      if (tile === WALL || tile === undefined) break;
+      if (tile === WALL || tile === VOID || tile === undefined) break;
       tiles.push({ x, y });
       if (tile === CRATE) break;
     }
@@ -422,7 +435,7 @@ function advanceFallingBlocks(state) {
 }
 
 export function dropDeathBlock(state, x, y) {
-  if (state.status !== "playing" || tileAt(state.grid, x, y) === WALL) return false;
+  if (state.status !== "playing" || ![EMPTY, CRATE].includes(tileAt(state.grid, x, y))) return false;
   if (state.fallingBlocks.some((block) => block.x === x && block.y === y)) return false;
   state.suddenDeathActive = true;
   state.fallingBlocks.push({ x, y, ttl: DEATH_BLOCK_FALL_SECONDS, duration: DEATH_BLOCK_FALL_SECONDS });
@@ -435,7 +448,7 @@ export function createSuddenDeathOrder(grid) {
   let right = BOARD_WIDTH - 2;
   let top = 1;
   let bottom = BOARD_HEIGHT - 2;
-  const add = (x, y) => { if (tileAt(grid, x, y) !== WALL) order.push({ x, y }); };
+  const add = (x, y) => { if ([EMPTY, CRATE].includes(tileAt(grid, x, y))) order.push({ x, y }); };
   while (left <= right && top <= bottom) {
     for (let x = left; x <= right; x += 1) add(x, top);
     top += 1;
@@ -501,6 +514,7 @@ export function snapshot(state) {
   return {
     tick: state.tick,
     mode: state.mode,
+    arenaType: state.arenaType,
     grid: state.grid,
     players: state.players.map(({ dropLatch, detonateLatch, specialLatch, invincibleUntilTick, queuedDirection, queuedDirectionUntilTick, ...player }) => ({
       ...player,
