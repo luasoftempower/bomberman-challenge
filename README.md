@@ -129,6 +129,12 @@ pnpm start
 
 ---
 
+## 🌐 Idiomas (ST-16)
+
+O menu quadrado de três traços ao lado do nome abre a opção de idioma. Dentro dele, o botão com a bandeira alterna entre Português e Inglês. A preferência fica salva no navegador e a troca atualiza os textos sem reiniciar a partida. O controle também está disponível no lobby, na partida e no resultado.
+
+Os dicionários e a lógica estão separados em `client/i18n/`. Veja o [guia do sistema de idiomas](client/i18n/README.md) para explicar o fluxo e adicionar traduções.
+
 ## 📈 Estado Atual e Contribuições
 
 Este projeto é um **protótipo jogável em desenvolvimento ativo**. Sugestões, relatórios de bugs, testes de estresse e contribuições via Pull Requests são extremamente bem-vindos!
