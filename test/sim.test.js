@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { dangerDeadlines, decideBotInput, hasEscapeRoute } from "../shared/bots.js";
-import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MAX_FIRE_RANGE, MOVE_SPEED, SPEED_UP_AMOUNT, TILE_SIZE, WALL } from "../shared/constants.js";
+import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MAX_FIRE_RANGE, MOVE_SPEED, SPEED_UP_AMOUNT, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
 import { createGrid, createMatch, dropDeathBlock, forceDetonate, indexOf, snapshot, step } from "../shared/sim.js";
 
 function openGrid() {
@@ -431,4 +431,49 @@ test("the protection suit blocks blasts and falling death blocks crush the arena
   for (let tick = 0; tick < 30 && deathState.status === "playing"; tick += 1) step(deathState, {});
   assert.equal(deathState.grid[indexOf(3, 3)], WALL);
   assert.equal(crushed.alive, false);
+});
+
+
+test("four or fewer players keep the classic square arena", () => {
+  const slots = Array.from({ length: 4 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(77, slots);
+  assert.equal(state.arenaType, "square");
+  assert.notEqual(state.grid[indexOf(0, 0)], VOID);
+});
+
+test("more than four players create an explicit hexagonal arena mask", () => {
+  const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(77, slots);
+  assert.equal(state.arenaType, "hexagon");
+  assert.equal(state.grid[indexOf(0, 0)], VOID);
+  assert.equal(state.grid[indexOf(12, 0)], VOID);
+  assert.equal(state.grid[indexOf(5, 0)], WALL);
+  assert.notEqual(state.grid[indexOf(6, 1)], VOID);
+});
+
+test("movement stops at the hexagonal arena boundary", () => {
+  const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(91, slots);
+  state.bombs = [];
+  state.blasts = [];
+  const player = state.players[0];
+  player.x = 5.5 * TILE_SIZE;
+  player.y = 1.5 * TILE_SIZE;
+  player.moveTarget = null;
+
+  const originalY = player.y;
+  for (let tick = 0; tick < 8; tick += 1) step(state, { [player.id]: { dx: 0, dy: -1 } });
+  assert.equal(player.y, originalY);
+  assert.equal(player.moveTarget, null);
+});
+
+test("bomb motion cannot cross invalid cells outside the hexagon", () => {
+  const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(92, slots);
+  state.grid = state.grid.split("").map((tile) => tile === CRATE ? EMPTY : tile).join("");
+  state.bombs = [{ ...bomb(99, 5, 1), slideDirection: { x: 0, y: -1 }, slideCooldown: 0 }];
+  step(state, {});
+  assert.equal(state.bombs[0].x, 5);
+  assert.equal(state.bombs[0].y, 1);
+  assert.equal(state.bombs[0].slideDirection, null);
 });

@@ -155,15 +155,22 @@ export class Room {
 
   start(playerId) {
     if (playerId !== this.hostId || this.phase !== "lobby") return;
+    const humans = this.slots.filter((slot) => slot.kind === "human");
+    const targetPlayerCount = Math.max(4, humans.length);
+    let activeCount = humans.length;
     for (const slot of this.slots) {
-      if (slot.kind === "empty") Object.assign(slot, { id: `bot-${this.code}-${slot.slot}`, name: `BOT ${slot.slot + 1}`, kind: "bot", ready: true });
-      if (!this.trophies.has(slot.id)) this.trophies.set(slot.id, 0);
+      if (slot.kind === "empty" && activeCount < targetPlayerCount) {
+        Object.assign(slot, { id: `bot-${this.code}-${slot.slot}`, name: `BOT ${slot.slot + 1}`, kind: "bot", ready: true });
+        activeCount += 1;
+      }
+      if (slot.kind !== "empty" && !this.trophies.has(slot.id)) this.trophies.set(slot.id, 0);
     }
+    const participants = this.slots.filter((slot) => slot.kind !== "empty");
     const seed = randomBytes(4).readUInt32LE(0);
-    this.state = createMatch(seed, this.slots.map(({ id, slot, name, kind }) => ({ id, slot, name, kind })), { mode: this.gameMode });
-    this.inputs = Object.fromEntries(this.slots.map(({ id }) => [id, { dx: 0, dy: 0, drop: false, detonate: false, special: false }]));
-    this.inputSequences = Object.fromEntries(this.slots.map(({ id }) => [id, -1]));
-    this.directionSequences = Object.fromEntries(this.slots.map(({ id }) => [id, -1]));
+    this.state = createMatch(seed, participants.map(({ id, slot, name, kind }) => ({ id, slot, name, kind })), { mode: this.gameMode });
+    this.inputs = Object.fromEntries(participants.map(({ id }) => [id, { dx: 0, dy: 0, drop: false, detonate: false, special: false }]));
+    this.inputSequences = Object.fromEntries(participants.map(({ id }) => [id, -1]));
+    this.directionSequences = Object.fromEntries(participants.map(({ id }) => [id, -1]));
     this.botPlans = {};
     this.phase = "playing";
     this.startsAt = Date.now() + MATCH_COUNTDOWN_MS;
