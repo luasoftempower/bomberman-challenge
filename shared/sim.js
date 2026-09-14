@@ -454,11 +454,22 @@ export function createSuddenDeathOrder(grid) {
 }
 
 function finishIfNeeded(state) {
+  // Verifica se a partida ainda está acontecendo
+  // e evita fazer essa verificação logo no começo do jogo
   if (state.status !== "playing" || state.tick === 0) return;
+
+  // Pega somente os jogadores que ainda estão vivos
   const alive = state.players.filter((player) => player.alive);
+
+  // Se sobrar apenas um jogador ou ninguém, a partida acaba
   if (alive.length <= 1) {
     state.status = "ended";
-    state.winnerSlot = alive.length === 1 ? alive[0].slot : null;
+
+    // Se tiver um jogador vivo, ele é o vencedor
+    // Se todos morrerem, fica null e a partida termina em empate
+    state.winnerSlot = alive.length === 1
+      ? alive[0].slot
+      : null;
   }
 }
 
