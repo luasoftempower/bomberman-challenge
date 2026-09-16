@@ -200,8 +200,6 @@ const CHARACTER_PALETTES = [
   { helmet: "#ed5037", suit: "#f15c3d", accent: "#ffd24d", gloves: "#ff9bad", boots: "#d93657" },
   { helmet: "#f0c83f", suit: "#d9a629", accent: "#fff173", gloves: "#ff9bad", boots: "#9a6a12" },
   { helmet: "#ec873d", suit: "#d66d27", accent: "#ffd0a2", gloves: "#ff9bad", boots: "#974319" },
-  { helmet: "#48c982", suit: "#2fa868", accent: "#b8ffce", gloves: "#ff9bad", boots: "#19764a" },
-  { helmet: "#df79de", suit: "#bc54bd", accent: "#ffd2ff", gloves: "#ff9bad", boots: "#813482" },
 ];
 
 function shade(color, amount) {

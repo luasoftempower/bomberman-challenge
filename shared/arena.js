@@ -22,7 +22,9 @@ export const HEXAGON_SPAWNS = Object.freeze([
 ]);
 
 export function arenaTypeForPlayerCount(playerCount) {
-  return playerCount > 4 ? ARENA_TYPES.HEXAGON : ARENA_TYPES.SQUARE;
+  return playerCount > 4
+    ? ARENA_TYPES.HEXAGON
+    : ARENA_TYPES.SQUARE;
 }
 
 export function isInsideArena(arenaType, x, y) {
