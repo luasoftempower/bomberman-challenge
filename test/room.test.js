@@ -11,11 +11,24 @@ test("room codes use six unambiguous characters", () => {
   for (let count = 0; count < 50; count += 1) assert.match(makeCode(), /^[A-HJ-NP-Z2-9]{6}$/);
 });
 
-test("the fifth human receives ROOM_FULL", () => {
+test("the ninth human receives ROOM_FULL", () => {
   const room = new Room("ABC234", "host-secret");
-  for (let count = 0; count < 4; count += 1) assert(room.addHuman(new FakeSocket(), { name: `P${count}`, hostToken: count === 0 ? "host-secret" : null }).id);
-  const fifth = room.addHuman(new FakeSocket(), { name: "Fifth" });
-  assert.equal(fifth.error.code, "ROOM_FULL");
+  for (let count = 0; count < 8; count += 1) assert(room.addHuman(new FakeSocket(), { name: `P${count}`, hostToken: count === 0 ? "host-secret" : null }).id);
+  const ninth = room.addHuman(new FakeSocket(), { name: "Ninth" });
+  assert.equal(ninth.error.code, "ROOM_FULL");
+});
+
+test("five humans start on the hexagonal arena without adding extra bots", () => {
+  const room = new Room("ABC234", "host-secret");
+  let host;
+  for (let count = 0; count < 5; count += 1) {
+    const joined = room.addHuman(new FakeSocket(), { name: `P${count}`, hostToken: count === 0 ? "host-secret" : null });
+    if (count === 0) host = joined;
+  }
+  room.start(host.id);
+  assert.equal(room.state.players.length, 5);
+  assert.equal(room.state.arenaType, "hexagon");
+  assert.equal(room.state.players.filter((player) => player.kind === "bot").length, 0);
 });
 
 test("stale input packets cannot overwrite a newer direction", () => {

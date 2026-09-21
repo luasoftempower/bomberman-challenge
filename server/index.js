@@ -58,10 +58,15 @@ server.on("upgrade", (request, socket, head) => {
 webSockets.on("connection", (socket) => {
   let room;
   let playerId;
-  const joinTimeout = setTimeout(() => socket.close(1008, "Join required"), 5_000);
+
+  const joinTimeout = setTimeout(
+    () => socket.close(1008, "Join required"),
+    5_000,
+  );
 
   socket.on("message", (raw) => {
     let message;
+
     try {
       message = JSON.parse(raw.toString());
     } catch {
@@ -69,38 +74,109 @@ webSockets.on("connection", (socket) => {
     }
 
     if (message.type === "ping") {
-      if (socket.readyState === 1) socket.send(JSON.stringify({ type: "pong", clientTime: message.clientTime, serverTime: Date.now() }));
+      if (socket.readyState === 1) {
+        socket.send(
+          JSON.stringify({
+            type: "pong",
+            clientTime: message.clientTime,
+            serverTime: Date.now(),
+          }),
+        );
+      }
+
       return;
     }
 
     if (!playerId) {
-      if (message.type !== "join") return socket.close(1008, "Join required");
-      room = rooms.get(String(message.roomCode || "").toUpperCase());
+      if (message.type !== "join") {
+        return socket.close(1008, "Join required");
+      }
+
+      room = rooms.get(
+        String(message.roomCode || "").toUpperCase(),
+      );
+
       if (!room) {
-        socket.send(JSON.stringify({ type: "error", code: "ROOM_NOT_FOUND", message: "Não encontramos essa sala." }));
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            code: "ROOM_NOT_FOUND",
+            message: "Não encontramos essa sala.",
+          }),
+        );
+
         return socket.close(1008, "Room not found");
       }
+
       const result = room.addHuman(socket, message);
+
       if (result.error) {
-        socket.send(JSON.stringify({ type: "error", ...result.error }));
-        return socket.close(1008, result.error.code);
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            ...result.error,
+          }),
+        );
+
+        return socket.close(
+          1008,
+          result.error.code,
+        );
       }
+
       playerId = result.id;
       clearTimeout(joinTimeout);
+
       return;
     }
 
-    if (message.type === "input") room.updateInput(playerId, message);
-    else if (message.type === "ready") room.setReady(playerId, message.ready);
-    else if (message.type === "botDifficulty") room.setBotDifficulty(playerId, message.difficulty);
-    else if (message.type === "gameMode") room.setGameMode(playerId, message.mode);
-    else if (message.type === "start") room.start(playerId);
-    else if (message.type === "rematch") room.rematch(playerId);
+    if (message.type === "input") {
+      room.updateInput(playerId, message);
+    }
+
+    else if (message.type === "ready") {
+      room.setReady(playerId, message.ready);
+    }
+
+    else if (message.type === "botDifficulty") {
+      room.setBotDifficulty(
+        playerId,
+        message.difficulty,
+      );
+    }
+
+    else if (message.type === "gameMode") {
+      room.setGameMode(
+        playerId,
+        message.mode,
+      );
+    }
+
+    // Adiciona bot manualmente.
+    else if (message.type === "addBot") {
+      room.addBot(playerId);
+    }
+
+    // Remove bot manualmente.
+    else if (message.type === "removeBot") {
+      room.removeBot(playerId);
+    }
+
+    else if (message.type === "start") {
+      room.start(playerId);
+    }
+
+    else if (message.type === "rematch") {
+      room.rematch(playerId);
+    }
   });
 
   socket.on("close", () => {
     clearTimeout(joinTimeout);
-    if (room && playerId) room.disconnect(playerId);
+
+    if (room && playerId) {
+      room.disconnect(playerId);
+    }
   });
 });
 

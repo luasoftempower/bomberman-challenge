@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { dangerDeadlines, decideBotInput, hasEscapeRoute } from "../shared/bots.js";
-import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MAX_FIRE_RANGE, MOVE_SPEED, SPEED_UP_AMOUNT, TILE_SIZE, WALL } from "../shared/constants.js";
+import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MAX_FIRE_RANGE, MOVE_SPEED, SPEED_UP_AMOUNT, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
 import { createGrid, createMatch, dropDeathBlock, forceDetonate, indexOf, snapshot, step } from "../shared/sim.js";
 
 function openGrid() {
@@ -431,4 +431,283 @@ test("the protection suit blocks blasts and falling death blocks crush the arena
   for (let tick = 0; tick < 30 && deathState.status === "playing"; tick += 1) step(deathState, {});
   assert.equal(deathState.grid[indexOf(3, 3)], WALL);
   assert.equal(crushed.alive, false);
+});
+
+
+// ============================================================
+// ARENAS - QUADRADA E HEXAGONAL
+// ============================================================
+
+test("four or fewer players keep the classic square arena", () => {
+  const slots = Array.from(
+    { length: 4 },
+    (_, slot) => ({
+      id: `p${slot}`,
+      slot,
+      name: `P${slot}`,
+      kind: "human",
+    }),
+  );
+
+  const state = createMatch(77, slots);
+
+  assert.equal(
+    state.arenaType,
+    "square",
+  );
+
+  // No mapa quadrado o canto faz parte da arena.
+  assert.notEqual(
+    state.grid[indexOf(0, 0)],
+    VOID,
+  );
+});
+
+
+// ============================================================
+// 5 JOGADORES = HEXÁGONO
+// ============================================================
+
+test("five players create an explicit hexagonal arena mask", () => {
+  const slots = Array.from(
+    { length: 5 },
+    (_, slot) => ({
+      id: `p${slot}`,
+      slot,
+      name: `P${slot}`,
+      kind: "human",
+    }),
+  );
+
+  const state = createMatch(
+    77,
+    slots,
+  );
+
+  assert.equal(
+    state.arenaType,
+    "hexagon",
+  );
+
+  // Cantos ficam fora da arena hexagonal.
+  assert.equal(
+    state.grid[indexOf(0, 0)],
+    VOID,
+  );
+
+  assert.equal(
+    state.grid[indexOf(12, 0)],
+    VOID,
+  );
+
+  // Parte superior válida continua sendo parede.
+  assert.equal(
+    state.grid[indexOf(5, 0)],
+    WALL,
+  );
+
+  // Área interna não pode ser VOID.
+  assert.notEqual(
+    state.grid[indexOf(6, 1)],
+    VOID,
+  );
+});
+
+
+// ============================================================
+// 6 JOGADORES = HEXÁGONO
+// ============================================================
+
+test("six players also use the hexagonal arena", () => {
+  const slots = Array.from(
+    { length: 6 },
+    (_, slot) => ({
+      id: `p${slot}`,
+      slot,
+      name: `P${slot}`,
+      kind: "human",
+    }),
+  );
+
+  const state = createMatch(
+    78,
+    slots,
+  );
+
+  assert.equal(
+    state.players.length,
+    6,
+  );
+
+  assert.equal(
+    state.arenaType,
+    "hexagon",
+  );
+
+  // Os cantos continuam fora da arena.
+  assert.equal(
+    state.grid[indexOf(0, 0)],
+    VOID,
+  );
+
+  assert.equal(
+    state.grid[indexOf(12, 0)],
+    VOID,
+  );
+
+  // O centro da arena continua válido.
+  assert.notEqual(
+    state.grid[indexOf(6, 5)],
+    VOID,
+  );
+});
+
+
+// ============================================================
+// MOVIMENTAÇÃO NA BORDA DO HEXÁGONO
+// ============================================================
+
+test("movement stops at the hexagonal arena boundary", () => {
+  const slots = Array.from(
+    { length: 6 },
+    (_, slot) => ({
+      id: `p${slot}`,
+      slot,
+      name: `P${slot}`,
+      kind: "human",
+    }),
+  );
+
+  const state = createMatch(
+    91,
+    slots,
+  );
+
+  state.bombs = [];
+  state.blasts = [];
+
+  const player =
+    state.players[0];
+
+  /*
+   * Coloca o jogador próximo da borda superior
+   * do hexágono.
+   */
+  player.x =
+    5.5 * TILE_SIZE;
+
+  player.y =
+    1.5 * TILE_SIZE;
+
+  player.moveTarget = null;
+
+  const originalY =
+    player.y;
+
+  /*
+   * Tenta andar para cima.
+   *
+   * Como a próxima célula está fora da arena,
+   * o jogador não pode se mover.
+   */
+  for (
+    let tick = 0;
+    tick < 8;
+    tick += 1
+  ) {
+    step(
+      state,
+      {
+        [player.id]: {
+          dx: 0,
+          dy: -1,
+        },
+      },
+    );
+  }
+
+  assert.equal(
+    player.y,
+    originalY,
+  );
+
+  assert.equal(
+    player.moveTarget,
+    null,
+  );
+});
+
+
+// ============================================================
+// BOMBAS NA BORDA DO HEXÁGONO
+// ============================================================
+
+test("bomb motion cannot cross invalid cells outside the hexagon", () => {
+  const slots = Array.from(
+    { length: 6 },
+    (_, slot) => ({
+      id: `p${slot}`,
+      slot,
+      name: `P${slot}`,
+      kind: "human",
+    }),
+  );
+
+  const state = createMatch(
+    92,
+    slots,
+  );
+
+  /*
+   * Remove caixas para que nenhuma delas
+   * interfira no teste da borda.
+   */
+  state.grid = state.grid
+    .split("")
+    .map(
+      (tile) =>
+        tile === CRATE
+          ? EMPTY
+          : tile,
+    )
+    .join("");
+
+  /*
+   * Coloca uma bomba próxima da borda
+   * tentando deslizar para fora do hexágono.
+   */
+  state.bombs = [
+    {
+      ...bomb(99, 5, 1),
+
+      slideDirection: {
+        x: 0,
+        y: -1,
+      },
+
+      slideCooldown: 0,
+    },
+  ];
+
+  step(
+    state,
+    {},
+  );
+
+  // A bomba deve continuar na posição original.
+  assert.equal(
+    state.bombs[0].x,
+    5,
+  );
+
+  assert.equal(
+    state.bombs[0].y,
+    1,
+  );
+
+  // O movimento da bomba deve ser interrompido.
+  assert.equal(
+    state.bombs[0].slideDirection,
+    null,
+  );
 });

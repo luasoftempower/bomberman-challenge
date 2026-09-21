@@ -10,7 +10,7 @@ export const MAX_BOMBS = 2;
 export const BLAST_RANGE = 2;
 export const FUSE_SECONDS = 1.95;
 export const BLAST_SECONDS = 0.4;
-export const ROOM_CAPACITY = 4;
+export const ROOM_CAPACITY = 8;
 export const GAME_MODES = Object.freeze({ CLASSIC: "classic", SUPER: "super" });
 export const POWERUP_TYPES = Object.freeze([
   "fire",
@@ -36,7 +36,9 @@ export const DEATH_BLOCK_FALL_SECONDS = 0.62;
 export const EMPTY = ".";
 export const WALL = "#";
 export const CRATE = "o";
+export const VOID = "x";
 
+// Classic spawn positions are kept here for backwards compatibility.
 export const SPAWNS = [
   { x: 1, y: 1 },
   { x: BOARD_WIDTH - 2, y: BOARD_HEIGHT - 2 },
@@ -44,7 +46,7 @@ export const SPAWNS = [
   { x: 1, y: BOARD_HEIGHT - 2 },
 ];
 
-export const PLAYER_COLORS = ["#9b6cff", "#c8ff50", "#ff6b8b", "#55dff7"];
+export const PLAYER_COLORS = ["#9b6cff", "#c8ff50", "#ff6b8b", "#55dff7", "#ffd24d", "#ff8f3d", "#57e389", "#f08cff"];
 
 export const DIRECTIONS = [
   { x: 1, y: 0 },

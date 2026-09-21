@@ -1,4 +1,4 @@
-import { BLAST_RANGE, BOARD_HEIGHT, BOARD_WIDTH, CRATE, DIRECTIONS, EMPTY, FUSE_SECONDS, MOVE_SPEED, TILE_SIZE, WALL } from "./constants.js";
+import { BLAST_RANGE, BOARD_HEIGHT, BOARD_WIDTH, CRATE, DIRECTIONS, EMPTY, FUSE_SECONDS, MOVE_SPEED, TILE_SIZE, VOID, WALL } from "./constants.js";
 import { indexOf, tileAt } from "./sim.js";
 
 const keyOf = (x, y) => `${x},${y}`;
@@ -10,7 +10,7 @@ function projectedBlastTiles(state, bomb, cratesBlock = false) {
       const x = bomb.x + direction.x * distance;
       const y = bomb.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
-      if (tile === WALL || tile === undefined) break;
+      if (tile === WALL || tile === VOID || tile === undefined) break;
       tiles.push({ x, y });
       if (cratesBlock && tile === CRATE) break;
     }
@@ -135,7 +135,7 @@ function usefulBombTarget(state, player, start) {
       const x = start.x + direction.x * distance;
       const y = start.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
-      if (tile === WALL || tile === undefined) break;
+      if (tile === WALL || tile === VOID || tile === undefined) break;
       if (tile === CRATE) return true;
       if (state.players.some((other) => other.alive && other.id !== player.id && Math.floor(other.x / TILE_SIZE) === x && Math.floor(other.y / TILE_SIZE) === y)) return true;
     }
