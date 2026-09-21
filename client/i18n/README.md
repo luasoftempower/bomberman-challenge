@@ -10,9 +10,14 @@ O sistema não precisa de bibliotecas externas. Ele tem duas partes: os textos e
 | `en.js` | As mesmas chaves, com textos em Inglês. |
 | `index.js` | Idioma atual, tradução, atualização da interface e persistência. |
 | `language.css` | Aparência da bandeira e dos textos do idioma. |
-| `../settings-menu.js` | Menu reutilizável: abertura, fechamento e espaço para novas opções. |
-| `../settings-menu.css` | Botão quadrado, animações e painel compacto. |
-| `../../../public/flags/` | Bandeiras desenhadas numa grade de pixels em SVG. |
+| `../settings-menu.js` | Controle de idioma no desktop e menu expansível no mobile. |
+| `../settings-menu.css` | Pill no desktop; botão quadrado, animações e painel no mobile. |
+| `../components/landing.js` | Página inicial dividida em cabeçalho, perfil, formulário, arte e rodapé. |
+| `../components/menu-intro.js` | HTML da abertura e sequência das animações. |
+| `../components/brand.js` | Logo reutilizado nas telas. |
+| `../utils/html.js` | Escape de caracteres especiais usado pelos componentes e pelas traduções. |
+| `../utils/format-time.js` | Formatação do tempo da partida. |
+| `../../public/flags/` | Bandeiras desenhadas numa grade de pixels em SVG. |
 
 As bandeiras ficam em `public/flags/` na raiz do projeto. A bandeira do Brasil acompanha o nome Português; a dos Estados Unidos acompanha English. O painel usa uma única linha compacta com bandeira, nome e seta de troca. O rótulo acessível informa o idioma atual e qual será selecionado ao clicar.
 
@@ -22,7 +27,7 @@ As bandeiras ficam em `public/flags/` na raiz do projeto. A bandeira do Brasil a
 2. Cada texto possui uma chave, como `menu.create`. Essa chave existe em `pt.js` e em `en.js`.
 3. `t("menu.create")` consulta o dicionário do idioma atual e devolve a frase.
 4. `text("menu.create")` gera a frase junto com sua chave no atributo `data-i18n`. Assim, o sistema lembra qual tradução aquele trecho usa.
-5. O botão de três traços abre o menu de opções. Dentro dele, o clique na bandeira chama `setLanguage()`: troca o idioma, salva a preferência e executa `applyTranslations()`.
+5. No desktop, uma pill mostra a bandeira e o idioma atual (Português ou English); um clique troca diretamente. Em telas de até 680px, o botão de três traços abre o menu com essa opção. Nos dois casos, o clique chama `setLanguage()`: troca o idioma, salva a preferência e executa `applyTranslations()`.
 6. `applyTranslations()` atualiza os textos e os rótulos acessíveis na página. Os campos, o canvas, os eventos e os temporizadores da partida continuam os mesmos.
 
 O elemento `i18n-text` usa `display: contents`: ele identifica o texto traduzível sem criar uma caixa extra no layout. As telas novas usam o idioma atual desde a montagem. A escolha também é sincronizada entre abas pelo evento `storage`.

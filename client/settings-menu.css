@@ -1,10 +1,32 @@
+/* O contêiner serve de referência para posicionar o painel abaixo do controle. */
 .settings-menu { position:relative; flex-shrink:0; z-index:10; }
 .settings-menu.is-open { z-index:30; }
+/* Desktop é o padrão. display:none retira a versão mobile do layout e do foco. */
+.settings-mobile { display:none; }
+/* A largura acompanha o nome do idioma; o raio alto produz o formato de pill. */
+.settings-desktop .language-toggle {
+  width:auto;
+  min-width:128px;
+  min-height:38px;
+  padding:7px 12px;
+  border:2px solid #75569f;
+  border-radius:999px;
+  background:linear-gradient(145deg,#29203d,#151020);
+  box-shadow:2px 3px 0 #080b14;
+}
+.settings-desktop .language-toggle:hover { border-color:var(--lime); }
+/* Até 680px, inverte os controles visíveis. O mesmo limite é usado no JS
+   para fechar o painel e ajustar o foco quando o tamanho da tela muda. */
+@media (max-width:680px) {
+  .settings-desktop { display:none; }
+  .settings-mobile { display:block; }
+}
+/* Área de 44 × 44px para facilitar o toque no botão quadrado do mobile. */
 .settings-menu-toggle {
   display:grid;
   place-items:center;
-  width:36px;
-  height:36px;
+  width:44px;
+  height:44px;
   padding:0;
   border:2px solid #75569f;
   border-radius:4px;
@@ -17,6 +39,7 @@
 .settings-menu-toggle:active { transform:translateY(1px) scale(.95); }
 .settings-menu-toggle:focus-visible { outline:3px solid var(--lime); outline-offset:4px; }
 .settings-menu-lines { position:relative; display:block; width:18px; height:16px; }
+/* As três linhas partem do mesmo ponto; os transforms separam ou cruzam as barras. */
 .settings-menu-lines i {
   position:absolute;
   left:0;
@@ -30,9 +53,12 @@
 .settings-menu-lines i:first-child { transform:translateY(-6px); }
 .settings-menu-lines i:last-child { transform:translateY(6px); }
 .settings-menu.is-open .settings-menu-toggle { border-color:var(--lime); background:#302044; }
+/* Ao abrir, cruza as linhas externas e oculta a central para formar o X. */
 .settings-menu.is-open .settings-menu-lines i:first-child { transform:rotate(45deg); }
 .settings-menu.is-open .settings-menu-lines i:nth-child(2) { transform:scaleX(.1); opacity:0; }
 .settings-menu.is-open .settings-menu-lines i:last-child { transform:rotate(-45deg); }
+/* opacity e transform animam a entrada; o JS mantém aria-hidden e inert
+   sincronizados para que o painel fechado também fique indisponível ao teclado. */
 .settings-menu-panel {
   position:absolute;
   top:calc(100% + 8px);

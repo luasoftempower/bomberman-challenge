@@ -1,6 +1,13 @@
 import "./styles.css";
 import "./i18n/language.css";
 import "./settings-menu.css";
+// Componentes devolvem o HTML das partes da interface; utilitários concentram
+// operações compartilhadas, como tratar valores no HTML e formatar o tempo.
+import { brand } from "./components/brand.js";
+import { landingMarkup, createRoomButtonContent } from "./components/landing.js";
+import { initializeMenuIntro } from "./components/menu-intro.js";
+import { escapeHtml } from "./utils/html.js";
+import { formatMatchTime } from "./utils/format-time.js";
 import { settingsMenu, initializeSettingsMenu } from "./settings-menu.js";
 import { t, text, attr, setText, initializeLanguage } from "./i18n/index.js";
 import { initializeAudio, playBombExplosionSound, playDeathSound, playDrawSound, playLuaSoftSound, playMatchCountdown, playWinSound, setMenuMusicActive, setWalkingSoundActive, startBattleTheme, stopMatchAudio } from "./audio.js";
@@ -11,10 +18,11 @@ import { GAME_MODES, MOVE_SPEED, PLAYER_COLORS } from "../shared/constants.js";
 
 const root = document.querySelector("#app");
 initializeAudio();
+// Registra os eventos de idioma e menu uma vez. Eles continuam ativos quando
+// as telas são substituídas, pois usam delegação de eventos no document.
 initializeLanguage();
 initializeSettingsMenu();
 const roomFromPath = () => location.pathname.match(/^\/r\/([A-Z2-9]{6})\/?$/i)?.[1]?.toUpperCase();
-const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
 const getName = () => localStorage.getItem("blast-name") || t("common.defaultName");
 
 let socket;
@@ -56,12 +64,6 @@ const ABILITY_META = {
   bombPass: ["BP", "ability.bombPass"],
   blockPass: ["CP", "ability.blockPass"],
 };
-
-function formatMatchTime(milliseconds) {
-  const totalSeconds = Math.max(0, Math.ceil((Number(milliseconds) || 0) / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  return `${minutes}:${String(totalSeconds % 60).padStart(2, "0")}`;
-}
 
 function stopVictory() {
   stopVictoryLoop?.();
@@ -147,10 +149,6 @@ function stopRenderLoop() {
   displaySnapshot = null;
 }
 
-function brand() {
-  return `<a class="brand" href="/" ${attr("aria-label", "common.home")}><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></a>`;
-}
-
 function renderLanding() {
   setMenuMusicActive(true);
   stopVictory();
@@ -161,64 +159,14 @@ function renderLanding() {
   lastLobbyGameMode = null;
   introShown = true;
   player = null;
-  root.innerHTML = `
-    <main class="menu-home ${showIntro ? "has-intro" : ""}">
-      ${showIntro ? `<div class="menu-intro" id="menu-intro"><div class="settings-corner">${settingsMenu()}</div><div class="intro-logo-wrap"><i aria-hidden="true"></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="intro-loader"><div class="intro-track"><i></i></div><span><b>${text("intro.preparing")}</b><em>${text("intro.loading")}</em></span></div><button class="intro-start" id="intro-start" type="button" disabled><span><small>${text("intro.ready")}</small>${text("intro.start")}</span><b aria-hidden="true">▶</b></button><section class="intro-story" aria-live="polite"><span class="intro-story-kicker">${text("intro.presents")}</span><h1>${text("intro.welcome")} <strong>BOMBERLAN</strong></h1><p>${text("intro.story")}</p><div class="intro-studio"><i aria-hidden="true">★</i><span>${text("intro.project")}<strong>${text("intro.team")}</strong></span><i aria-hidden="true">★</i></div></section></div>` : ""}
-      <header class="menu-header">
-        ${brand()}
-        <div class="player-preferences"><label class="player-profile" for="player-name"><span class="profile-avatar">B</span><span class="profile-copy"><small>${text("menu.nameLabel")}</small><input form="create-form" id="player-name" maxlength="16" autocomplete="nickname" ${attr("placeholder", "menu.namePlaceholder")} value="${escapeHtml(getName())}" required /></span></label>${settingsMenu()}</div>
-        <div class="status-pill"><i></i> ${text("menu.online")}</div>
-      </header>
-      <section class="menu-stage">
-        <div class="menu-options">
-          <div class="menu-kicker"><span>●</span> ${text("menu.welcome")}</div>
-          <div class="battle-logo" role="img" ${attr("aria-label", "menu.battleLabel")}><span>${text("menu.enterBattle")}</span><strong>${text("menu.battle")}</strong><em>${text("menu.multiplayer")}</em></div>
-          <form class="arcade-menu-form" id="create-form">
-            <button class="arcade-action create-room-action" type="submit"><span><small>${text("menu.onlineMatch")}</small>${text("menu.create")}</span><b>▶</b></button>
-            <div class="join-room-action">
-              <label for="room-code">${text("menu.friend")}</label>
-              <div class="menu-code-row"><input id="room-code" maxlength="6" ${attr("aria-label", "common.roomCode")} ${attr("placeholder", "common.roomCodeLabel")} pattern="[A-Za-z2-9]{6}" /><button type="button" id="join-button"><span>${text("menu.join")}</span><b>▶</b></button></div>
-            </div>
-            <p class="form-error menu-error" id="form-error" role="alert"></p>
-          </form>
-        </div>
-        <div class="menu-hero-art" aria-hidden="true">
-          <div class="arena-rank"><span>★</span><small>${text("menu.mode")}</small><b>${text("mode.classic")}</b></div>
-          <div class="hero-burst"></div>
-          <canvas id="menu-mascot-canvas" width="360" height="432" ${attr("aria-label", "menu.mascot")}></canvas>
-          <div class="player-count"><b>4</b><span>${text("menu.players")}<br><small>${text("menu.humansBots")}</small></span></div>
-        </div>
-      </section>
-      <div class="menu-footer"><span><b>WASD</b> ${text("menu.move")}</span><i></i><span><b>${text("controls.space")}</b> ${text("menu.bomb")}</span><i></i><span>${text("menu.lastAlive")} <b>${text("menu.wins")}</b></span></div>
-    </main>`;
+  // Entrega ao componente apenas os dados usados para montar a página inicial.
+  // O nome salvo é preservado; somente o nome padrão vem do dicionário de idioma.
+  root.innerHTML = landingMarkup({ showIntro, playerName: getName() });
 
+  // O canvas e o botão de início já existem no DOM após a montagem acima.
   stopMenuMascotLoop = startMenuMascotAnimation(root.querySelector("#menu-mascot-canvas"));
-  if (showIntro) {
-    const intro = root.querySelector("#menu-intro");
-    const home = root.querySelector(".menu-home");
-    const startButton = root.querySelector("#intro-start");
-    const readyTimer = setTimeout(() => {
-      intro?.classList.add("ready");
-      if (startButton) {
-        startButton.disabled = false;
-        startButton.focus({ preventScroll: true });
-      }
-    }, 1320);
-
-    startButton?.addEventListener("click", () => {
-      clearTimeout(readyTimer);
-      startButton.disabled = true;
-      intro?.classList.add("starting");
-      setTimeout(() => intro?.classList.add("story-mode"), 1400);
-      setTimeout(() => playLuaSoftSound(), 11000);
-      setTimeout(() => {
-        home?.classList.add("intro-complete");
-        intro?.classList.add("leaving");
-
-      }, 16100);
-      setTimeout(() => intro?.remove(), 16600);
-    }, { once: true });
-  }
+  // Passa a função de áudio sem executá-la: a abertura a chama no momento adequado.
+  if (showIntro) initializeMenuIntro(root, playLuaSoftSound);
 
   root.querySelector("#create-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -236,11 +184,19 @@ function renderLanding() {
     } catch {
       root.querySelector("#form-error").innerHTML = text("error.retry");
       button.disabled = false;
-      button.innerHTML = `<span><small>${text("menu.onlineMatch")}</small>${text("menu.create")}</span><b>▶</b>`;
+      // Reutiliza o conteúdo original no idioma atual, permitindo tentar novamente.
+      button.innerHTML = createRoomButtonContent();
     }
   });
   root.querySelector("#join-button").addEventListener("click", joinFromLanding);
-  root.querySelector("#room-code").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); joinFromLanding(); } });
+  root.querySelector("#room-code").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      // Enter no campo de código deve entrar na sala, e não enviar o formulário
+      // de criação que envolve esse campo. Por isso bloqueamos o submit padrão.
+      event.preventDefault();
+      joinFromLanding();
+    }
+  });
 }
 
 function saveName() {
@@ -251,7 +207,11 @@ function saveName() {
 
 function joinFromLanding() {
   const code = root.querySelector("#room-code").value.trim().toUpperCase();
-  if (!/^[A-Z2-9]{6}$/.test(code)) { root.querySelector("#form-error").innerHTML = text("error.code"); return; }
+  if (!/^[A-Z2-9]{6}$/.test(code)) {
+    // Mostra um erro traduzível e encerra antes de mudar a URL ou tentar conectar.
+    root.querySelector("#form-error").innerHTML = text("error.code");
+    return;
+  }
   const name = saveName();
   history.pushState({}, "", `/r/${code}`);
   connectToRoom(code, name);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { dictionaries, setLanguage, getLanguage, t, text, attr, STORAGE_KEY } from "../client/i18n/index.js";
 
 test("PT and EN cover the same messages and interpolation parameters", () => {
@@ -14,10 +14,17 @@ test("PT and EN cover the same messages and interpolation parameters", () => {
 });
 
 test("all translation keys referenced by the main screens exist", async () => {
-  const source = await readFile(new URL("../client/main.js", import.meta.url), "utf8");
+  // Depois da extração do HTML, as chaves também ficam nos componentes.
+  // Incluímos esses arquivos para não perder a verificação feita antes no main.js.
+  const components = await readdir(new URL("../client/components/", import.meta.url));
+  const files = ["main.js", "settings-menu.js", ...components.filter((file) => file.endsWith(".js")).map((file) => `components/${file}`)];
+  // As leituras são independentes; Promise.all aguarda todos os textos do código.
+  const sources = await Promise.all(files.map((file) => readFile(new URL(`../client/${file}`, import.meta.url), "utf8")));
   const namespaces = [...new Set(Object.keys(dictionaries.pt).map((key) => key.split(".")[0]))];
   const pattern = new RegExp(`"((?:${namespaces.join("|")})\\.[\\w]+)"`, "g");
-  for (const [, key] of source.matchAll(pattern)) assert.ok(Object.hasOwn(dictionaries.pt, key), key);
+  for (const source of sources) {
+    for (const [, key] of source.matchAll(pattern)) assert.ok(Object.hasOwn(dictionaries.pt, key), key);
+  }
 });
 
 test("changing language translates sentences but preserves player names and room codes", () => {

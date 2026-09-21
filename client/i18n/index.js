@@ -1,6 +1,10 @@
 // importa os arquivos onde ficam as traduções em português e inglês
 import pt from "./pt.js";
 import en from "./en.js";
+// Compartilha a mesma proteção de HTML com os componentes, sem duplicar a função.
+import { escapeHtml } from "../utils/html.js";
+// Mantém compatibilidade com quem já importava escapeHtml pelo módulo de idiomas.
+export { escapeHtml } from "../utils/html.js";
 
 
 // essa chave é usada no localStorage pra salvar o idioma que o usuário escolheu
@@ -39,25 +43,6 @@ try {
 // essa função retorna qual idioma está sendo usado no momento
 // pode ser útil em outras partes do código que precisem saber se está em pt ou en
 export const getLanguage = () => language;
-
-
-// essa função serve pra tratar caracteres especiais antes de colocar textos no HTML
-// isso evita que coisas como <, > ou aspas sejam interpretadas como código HTML
-//
-// por exemplo:
-// <teste> vira &lt;teste&gt;
-//
-// além de evitar problemas no HTML, isso também ajuda na segurança
-export const escapeHtml = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (character) =>
-    ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    })[character]
-  );
 
 
 // essa é a função principal da tradução
