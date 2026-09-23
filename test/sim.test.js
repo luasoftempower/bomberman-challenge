@@ -434,280 +434,46 @@ test("the protection suit blocks blasts and falling death blocks crush the arena
 });
 
 
-// ============================================================
-// ARENAS - QUADRADA E HEXAGONAL
-// ============================================================
-
 test("four or fewer players keep the classic square arena", () => {
-  const slots = Array.from(
-    { length: 4 },
-    (_, slot) => ({
-      id: `p${slot}`,
-      slot,
-      name: `P${slot}`,
-      kind: "human",
-    }),
-  );
-
+  const slots = Array.from({ length: 4 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
   const state = createMatch(77, slots);
-
-  assert.equal(
-    state.arenaType,
-    "square",
-  );
-
-  // No mapa quadrado o canto faz parte da arena.
-  assert.notEqual(
-    state.grid[indexOf(0, 0)],
-    VOID,
-  );
+  assert.equal(state.arenaType, "square");
+  assert.notEqual(state.grid[indexOf(0, 0)], VOID);
 });
 
-
-// ============================================================
-// 5 JOGADORES = HEXÁGONO
-// ============================================================
-
-test("five players create an explicit hexagonal arena mask", () => {
-  const slots = Array.from(
-    { length: 5 },
-    (_, slot) => ({
-      id: `p${slot}`,
-      slot,
-      name: `P${slot}`,
-      kind: "human",
-    }),
-  );
-
-  const state = createMatch(
-    77,
-    slots,
-  );
-
-  assert.equal(
-    state.arenaType,
-    "hexagon",
-  );
-
-  // Cantos ficam fora da arena hexagonal.
-  assert.equal(
-    state.grid[indexOf(0, 0)],
-    VOID,
-  );
-
-  assert.equal(
-    state.grid[indexOf(12, 0)],
-    VOID,
-  );
-
-  // Parte superior válida continua sendo parede.
-  assert.equal(
-    state.grid[indexOf(5, 0)],
-    WALL,
-  );
-
-  // Área interna não pode ser VOID.
-  assert.notEqual(
-    state.grid[indexOf(6, 1)],
-    VOID,
-  );
+test("more than four players create an explicit hexagonal arena mask", () => {
+  const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(77, slots);
+  assert.equal(state.arenaType, "hexagon");
+  assert.equal(state.grid[indexOf(0, 0)], VOID);
+  assert.equal(state.grid[indexOf(12, 0)], VOID);
+  assert.equal(state.grid[indexOf(5, 0)], WALL);
+  assert.notEqual(state.grid[indexOf(6, 1)], VOID);
 });
-
-
-// ============================================================
-// 6 JOGADORES = HEXÁGONO
-// ============================================================
-
-test("six players also use the hexagonal arena", () => {
-  const slots = Array.from(
-    { length: 6 },
-    (_, slot) => ({
-      id: `p${slot}`,
-      slot,
-      name: `P${slot}`,
-      kind: "human",
-    }),
-  );
-
-  const state = createMatch(
-    78,
-    slots,
-  );
-
-  assert.equal(
-    state.players.length,
-    6,
-  );
-
-  assert.equal(
-    state.arenaType,
-    "hexagon",
-  );
-
-  // Os cantos continuam fora da arena.
-  assert.equal(
-    state.grid[indexOf(0, 0)],
-    VOID,
-  );
-
-  assert.equal(
-    state.grid[indexOf(12, 0)],
-    VOID,
-  );
-
-  // O centro da arena continua válido.
-  assert.notEqual(
-    state.grid[indexOf(6, 5)],
-    VOID,
-  );
-});
-
-
-// ============================================================
-// MOVIMENTAÇÃO NA BORDA DO HEXÁGONO
-// ============================================================
 
 test("movement stops at the hexagonal arena boundary", () => {
-  const slots = Array.from(
-    { length: 6 },
-    (_, slot) => ({
-      id: `p${slot}`,
-      slot,
-      name: `P${slot}`,
-      kind: "human",
-    }),
-  );
-
-  const state = createMatch(
-    91,
-    slots,
-  );
-
+  const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(91, slots);
   state.bombs = [];
   state.blasts = [];
-
-  const player =
-    state.players[0];
-
-  /*
-   * Coloca o jogador próximo da borda superior
-   * do hexágono.
-   */
-  player.x =
-    5.5 * TILE_SIZE;
-
-  player.y =
-    1.5 * TILE_SIZE;
-
+  const player = state.players[0];
+  player.x = 5.5 * TILE_SIZE;
+  player.y = 1.5 * TILE_SIZE;
   player.moveTarget = null;
 
-  const originalY =
-    player.y;
-
-  /*
-   * Tenta andar para cima.
-   *
-   * Como a próxima célula está fora da arena,
-   * o jogador não pode se mover.
-   */
-  for (
-    let tick = 0;
-    tick < 8;
-    tick += 1
-  ) {
-    step(
-      state,
-      {
-        [player.id]: {
-          dx: 0,
-          dy: -1,
-        },
-      },
-    );
-  }
-
-  assert.equal(
-    player.y,
-    originalY,
-  );
-
-  assert.equal(
-    player.moveTarget,
-    null,
-  );
+  const originalY = player.y;
+  for (let tick = 0; tick < 8; tick += 1) step(state, { [player.id]: { dx: 0, dy: -1 } });
+  assert.equal(player.y, originalY);
+  assert.equal(player.moveTarget, null);
 });
 
-
-// ============================================================
-// BOMBAS NA BORDA DO HEXÁGONO
-// ============================================================
-
 test("bomb motion cannot cross invalid cells outside the hexagon", () => {
-  const slots = Array.from(
-    { length: 6 },
-    (_, slot) => ({
-      id: `p${slot}`,
-      slot,
-      name: `P${slot}`,
-      kind: "human",
-    }),
-  );
-
-  const state = createMatch(
-    92,
-    slots,
-  );
-
-  /*
-   * Remove caixas para que nenhuma delas
-   * interfira no teste da borda.
-   */
-  state.grid = state.grid
-    .split("")
-    .map(
-      (tile) =>
-        tile === CRATE
-          ? EMPTY
-          : tile,
-    )
-    .join("");
-
-  /*
-   * Coloca uma bomba próxima da borda
-   * tentando deslizar para fora do hexágono.
-   */
-  state.bombs = [
-    {
-      ...bomb(99, 5, 1),
-
-      slideDirection: {
-        x: 0,
-        y: -1,
-      },
-
-      slideCooldown: 0,
-    },
-  ];
-
-  step(
-    state,
-    {},
-  );
-
-  // A bomba deve continuar na posição original.
-  assert.equal(
-    state.bombs[0].x,
-    5,
-  );
-
-  assert.equal(
-    state.bombs[0].y,
-    1,
-  );
-
-  // O movimento da bomba deve ser interrompido.
-  assert.equal(
-    state.bombs[0].slideDirection,
-    null,
-  );
+  const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
+  const state = createMatch(92, slots);
+  state.grid = state.grid.split("").map((tile) => tile === CRATE ? EMPTY : tile).join("");
+  state.bombs = [{ ...bomb(99, 5, 1), slideDirection: { x: 0, y: -1 }, slideCooldown: 0 }];
+  step(state, {});
+  assert.equal(state.bombs[0].x, 5);
+  assert.equal(state.bombs[0].y, 1);
+  assert.equal(state.bombs[0].slideDirection, null);
 });

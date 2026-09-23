@@ -10,7 +10,7 @@ export const MAX_BOMBS = 2;
 export const BLAST_RANGE = 2;
 export const FUSE_SECONDS = 1.95;
 export const BLAST_SECONDS = 0.4;
-export const ROOM_CAPACITY = 8;
+export const ROOM_CAPACITY = 6;
 export const GAME_MODES = Object.freeze({ CLASSIC: "classic", SUPER: "super" });
 export const POWERUP_TYPES = Object.freeze([
   "fire",

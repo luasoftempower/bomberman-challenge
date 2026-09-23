@@ -2091,6 +2091,40 @@ function renderLobby(lobby) {
           </p>
 
           ${botDifficultyPanel}
+          ${
+              isHost
+                ? `
+                    <section class="bot-control-panel">
+                      <header>
+                        <span>CONTROLE DA EQUIPE</span>
+                        <b>JOGADORES BOT</b>
+                      </header>
+
+                      <div class="bot-control-buttons">
+                        <button
+                          type="button"
+                          id="add-bot-button"
+                        >
+                          + ADICIONAR BOT
+                        </button>
+
+                        <button
+                          type="button"
+                          id="remove-bot-button"
+                        >
+                          − REMOVER BOT
+                        </button>
+                      </div>
+
+                      <p>
+                        Adicione bots para testar partidas com até
+                        ${ROOM_CAPACITY} jogadores.
+                      </p>
+                    </section>
+                  `
+                : ""
+
+          }
 
         </aside>
 
@@ -2197,6 +2231,30 @@ function renderLobby(lobby) {
         send({
           type: "ready",
           ready: !ownSlot?.ready,
+        });
+      },
+    );
+    // Adicionar bot manualmente.
+  root
+    .querySelector("#add-bot-button")
+    ?.addEventListener(
+      "click",
+      () => {
+        send({
+          type: "addBot",
+        });
+      },
+    );
+
+
+  // Remover bot manualmente.
+  root
+    .querySelector("#remove-bot-button")
+    ?.addEventListener(
+      "click",
+      () => {
+        send({
+          type: "removeBot",
         });
       },
     );
