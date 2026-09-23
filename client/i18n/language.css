@@ -1,0 +1,8 @@
+/* O texto traduzido herda o estilo da tela, sem criar uma caixa extra. */
+i18n-text { display:contents; }
+
+/* Dimensões próprias: os estilos do logo nunca devem redimensionar a bandeira. */
+.language-toggle > img { display:block; width:28px; height:20px; flex:0 0 28px; object-fit:contain; image-rendering:pixelated; }
+.language-copy { display:block; flex:1; min-width:0; white-space:nowrap; }
+.language-copy strong { color:#f6f3ff; font:600 14px/1.2 "Pixelify Sans",sans-serif; }
+.language-switch { flex-shrink:0; color:var(--lime); font:600 15px/1 "Pixelify Sans",sans-serif; }
