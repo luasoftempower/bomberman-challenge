@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { decideBotInput } from "../shared/bots.js";
 import {
   GAME_MODES,
-  ROOM_CAPACITY,
+  getRoomCapacity,
   TICK_RATE,
 } from "../shared/constants.js";
 
@@ -150,20 +150,10 @@ export class Room {
 
     this.phase = "lobby";
 
-    /*
-     * A quantidade máxima de jogadores é definida
-     * por ROOM_CAPACITY em shared/constants.js.
-     *
-     * Para a nova versão:
-     *
-     * ROOM_CAPACITY = 6
-     *
-     * Portanto serão criados apenas os slots:
-     * 0, 1, 2, 3, 4 e 5.
-     */
+    // A sala começa no clássico, com quatro vagas.
     this.slots = Array.from(
       {
-        length: ROOM_CAPACITY,
+        length: getRoomCapacity(GAME_MODES.CLASSIC),
       },
       (_, slot) => ({
         slot,
@@ -238,13 +228,7 @@ export class Room {
       };
     }
 
-    /*
-     * Procura um dos slots disponíveis.
-     *
-     * Como this.slots possui ROOM_CAPACITY posições,
-     * quando ROOM_CAPACITY = 6 o sétimo jogador
-     * não encontrará uma vaga.
-     */
+    // As vagas disponíveis respeitam a capacidade do modo atual.
     const open = this.slots.find(
       (slot) =>
         slot.kind === "empty",
@@ -354,6 +338,7 @@ export class Room {
       type: "lobby",
 
       hostId: this.hostId,
+      capacity: getRoomCapacity(this.gameMode),
 
       botDifficulty:
         this.botDifficulty,
@@ -367,6 +352,7 @@ export class Room {
           id,
           name,
           ready,
+          manual,
           kind,
         }) => ({
           slot,
@@ -377,6 +363,7 @@ export class Room {
             Boolean(ready),
 
           kind,
+          manual: Boolean(manual),
 
           trophies:
             this.trophies.get(id) ||
@@ -470,7 +457,7 @@ export class Room {
     return;
   }
 
-  const id = `bot-${this.code}-${open.slot}`;
+  const id = `bot-${this.code}-${randomBytes(8).toString("hex")}`;
 
   Object.assign(open, {
     id,
@@ -583,6 +570,21 @@ removeBot(playerId) {
       return;
     }
 
+    const capacity = getRoomCapacity(mode);
+    const occupied = this.slots.filter((slot) => slot.kind !== "empty");
+    if (occupied.length > capacity) {
+      this.broadcastLobby();
+      return;
+    }
+
+    // Reaproveita vagas livres antes de reduzir a sala, preservando os jogadores.
+    const nextSlots = Array.from({ length: capacity }, (_, slot) =>
+      this.slots[slot] || { slot, kind: "empty" });
+    for (const participant of occupied.filter((slot) => slot.slot >= capacity)) {
+      const index = nextSlots.findIndex((slot) => slot.kind === "empty");
+      nextSlots[index] = { ...participant, slot: index };
+    }
+    this.slots = nextSlots;
     this.gameMode = mode;
 
     this.broadcastLobby();
@@ -729,7 +731,7 @@ removeBot(playerId) {
      * 5 humanos -> 5 jogadores
      * 6 humanos -> 6 jogadores
      *
-     * Esses casos usam arena hexagonal.
+     * Esses casos usam arena retangular.
      *
      * Não completamos partidas de 5 jogadores
      * automaticamente para 6 com bot.
@@ -807,8 +809,8 @@ removeBot(playerId) {
      * createMatch receberá:
      *
      * 4 jogadores -> arena quadrada
-     * 5 jogadores -> arena hexagonal
-     * 6 jogadores -> arena hexagonal
+     * 5 jogadores -> arena retangular
+     * 6 jogadores -> arena retangular
      */
     this.state =
       createMatch(
@@ -961,7 +963,8 @@ removeBot(playerId) {
 
       if (
         slot.kind === "bot" &&
-        !slot.socket
+        !slot.socket &&
+        !slot.manual
       ) {
         this.slots[
           slotIndex

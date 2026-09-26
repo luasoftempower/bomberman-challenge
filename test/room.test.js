@@ -68,6 +68,7 @@ test("the seventh human receives ROOM_FULL", () => {
     );
 
     assert(joined.id);
+    if (count === 0) room.setGameMode(joined.id, "super");
   }
 
   // O jogador 7 deve ser recusado.
@@ -86,10 +87,10 @@ test("the seventh human receives ROOM_FULL", () => {
 
 
 // ============================================================
-// ARENA HEXAGONAL
+// ARENA RETANGULAR
 // ============================================================
 
-test("five humans start on the hexagonal arena without adding extra bots", () => {
+test("five humans start on the rectangular arena without adding extra bots", () => {
   const room = new Room(
     "ABC234",
     "host-secret",
@@ -115,6 +116,7 @@ test("five humans start on the hexagonal arena without adding extra bots", () =>
 
     if (count === 0) {
       host = joined;
+      room.setGameMode(host.id, "super");
     }
   }
 
@@ -127,7 +129,7 @@ test("five humans start on the hexagonal arena without adding extra bots", () =>
 
   assert.equal(
     room.state.arenaType,
-    "hexagon",
+    "rectangle",
   );
 
   assert.equal(
@@ -140,7 +142,7 @@ test("five humans start on the hexagonal arena without adding extra bots", () =>
 });
 
 
-test("six humans start on the hexagonal arena without adding extra bots", () => {
+test("six humans start on the rectangular arena without adding extra bots", () => {
   const room = new Room(
     "ABC234",
     "host-secret",
@@ -166,6 +168,7 @@ test("six humans start on the hexagonal arena without adding extra bots", () => 
 
     if (count === 0) {
       host = joined;
+      room.setGameMode(host.id, "super");
     }
   }
 
@@ -178,7 +181,7 @@ test("six humans start on the hexagonal arena without adding extra bots", () => 
 
   assert.equal(
     room.state.arenaType,
-    "hexagon",
+    "rectangle",
   );
 
   assert.equal(

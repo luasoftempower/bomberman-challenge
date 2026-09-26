@@ -1,6 +1,6 @@
 import { BOARD_HEIGHT, BOARD_WIDTH } from "./constants.js";
 
-export const ARENA_TYPES = Object.freeze({ SQUARE: "square", HEXAGON: "hexagon" });
+export const ARENA_TYPES = Object.freeze({ SQUARE: "square", RECTANGLE: "rectangle" });
 
 export const SQUARE_SPAWNS = Object.freeze([
   { x: 1, y: 1 },
@@ -9,32 +9,36 @@ export const SQUARE_SPAWNS = Object.freeze([
   { x: 1, y: BOARD_HEIGHT - 2 },
 ]);
 
-// Eight safe starting points distributed around the six-sided arena.
-export const HEXAGON_SPAWNS = Object.freeze([
-  { x: 5, y: 1 },
-  { x: 7, y: 1 },
-  { x: 3, y: 3 },
-  { x: 9, y: 3 },
-  { x: 1, y: 5 },
-  { x: 11, y: 5 },
-  { x: 3, y: 7 },
-  { x: 9, y: 7 },
+export const RECTANGLE_WIDTH = 23;
+export const RECTANGLE_HEIGHT = 15;
+export function arenaDimensions(arenaType) {
+  return arenaType === ARENA_TYPES.RECTANGLE
+    ? { width: RECTANGLE_WIDTH, height: RECTANGLE_HEIGHT }
+    : { width: BOARD_WIDTH, height: BOARD_HEIGHT };
+}
+// Grid strings include outside cells and have one of two fixed sizes.
+export function gridDimensions(grid) {
+  return arenaDimensions(grid?.length === RECTANGLE_WIDTH * RECTANGLE_HEIGHT ? ARENA_TYPES.RECTANGLE : ARENA_TYPES.SQUARE);
+}
+// Four corners, then the middle of the top and bottom edges.
+export const RECTANGLE_SPAWNS = Object.freeze([
+  { x: 1, y: 1 },
+  { x: RECTANGLE_WIDTH - 2, y: RECTANGLE_HEIGHT - 2 },
+  { x: RECTANGLE_WIDTH - 2, y: 1 },
+  { x: 1, y: RECTANGLE_HEIGHT - 2 },
+  { x: Math.floor(RECTANGLE_WIDTH / 2), y: 1 },
+  { x: Math.floor(RECTANGLE_WIDTH / 2), y: RECTANGLE_HEIGHT - 2 },
 ]);
 
 export function arenaTypeForPlayerCount(playerCount) {
   return playerCount > 4
-    ? ARENA_TYPES.HEXAGON
+    ? ARENA_TYPES.RECTANGLE
     : ARENA_TYPES.SQUARE;
 }
 
 export function isInsideArena(arenaType, x, y) {
-  if (x < 0 || y < 0 || x >= BOARD_WIDTH || y >= BOARD_HEIGHT) return false;
-  if (arenaType !== ARENA_TYPES.HEXAGON) return true;
-
-  // A discrete six-sided mask: short horizontal top/bottom edges and four diagonal edges.
-  const distanceFromMiddle = Math.abs(y - Math.floor(BOARD_HEIGHT / 2));
-  const inset = distanceFromMiddle;
-  return x >= inset && x < BOARD_WIDTH - inset;
+  const { width, height } = arenaDimensions(arenaType);
+  return x >= 0 && y >= 0 && x < width && y < height;
 }
 
 export function isArenaBoundary(arenaType, x, y) {
@@ -45,5 +49,5 @@ export function isArenaBoundary(arenaType, x, y) {
 }
 
 export function spawnsForArena(arenaType) {
-  return arenaType === ARENA_TYPES.HEXAGON ? HEXAGON_SPAWNS : SQUARE_SPAWNS;
+  return arenaType === ARENA_TYPES.RECTANGLE ? RECTANGLE_SPAWNS : SQUARE_SPAWNS;
 }

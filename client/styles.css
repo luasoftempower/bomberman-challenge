@@ -540,7 +540,7 @@ button:disabled { opacity:.55; cursor:wait; }
 .game-layout { width:min(1180px,100%); flex:1; display:grid; grid-template-columns:minmax(0,860px) minmax(260px,280px); justify-content:center; align-items:center; gap:30px; margin:auto; }
 .arena-wrap { width:min(100%,820px); position:relative; padding:10px; background:#080f1a; border:4px solid #352c52; box-shadow:0 0 0 3px #0a0711, 0 0 0 5px #7761b4, 0 22px 55px rgba(0,0,0,.42), inset 0 0 0 2px #141f31; justify-self:end; }
 .arena-wrap::before { content:""; position:absolute; left:8px; right:8px; top:5px; height:3px; background:linear-gradient(90deg,#c8ff50 0 8%,#5c4a8d 8% 92%,#ff6b70 92%); opacity:.85; }
-.arena-wrap canvas { display:block; width:100%; aspect-ratio:13/11; image-rendering:pixelated; image-rendering:crisp-edges; transform:translateZ(0); will-change:contents; }
+.arena-wrap canvas { display:block; width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; transform:translateZ(0); will-change:contents; }
 .corner-mark { position:absolute; width:22px; height:22px; border-color:var(--lime); filter:drop-shadow(0 0 5px rgba(200,255,80,.35)); }
 .corner-mark.top-left { left:-7px; top:-7px; border-left:4px solid; border-top:4px solid; }
 .corner-mark.bottom-right { right:-7px; bottom:-7px; border-right:4px solid; border-bottom:4px solid; }
@@ -961,3 +961,15 @@ kbd { display:inline-block; min-width:24px; text-align:center; padding:4px 5px; 
   .mode-switching .lobby-actions > * { animation:none; opacity:1; transform:none; filter:none; }
   .lobby-shell.mode-switching::after { display:none; }
 }
+
+/* Controles de bots e limite de participantes do lobby. */
+.bot-control-panel { margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,.09); }
+.bot-control-panel header { display:grid; gap:6px; margin-bottom:12px; }
+.bot-control-panel header span { color:var(--lime); font:500 7px Silkscreen; letter-spacing:.13em; }
+.bot-control-panel header b { color:#f2edfa; font:500 9px Silkscreen; }
+.bot-control-buttons { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.bot-control-buttons button { min-height:44px; padding:10px 7px; border:1px solid #79658f; color:#f2edfa; background:#211a2c; font:500 8px/1.5 Silkscreen; cursor:pointer; }
+.bot-control-buttons button:hover:not(:disabled) { border-color:var(--lime); }
+.bot-control-buttons button:disabled, .mode-card:disabled { cursor:not-allowed; }
+.bot-control-panel > p, .mode-capacity-hint { color:#aaa1b5; font:400 8px/1.6 Silkscreen; }
+.bot-control-buttons button:focus-visible { outline:2px solid var(--lime); outline-offset:3px; }

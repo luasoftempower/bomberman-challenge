@@ -1,7 +1,6 @@
 import {
   BLAST_RANGE,
   BLAST_SECONDS,
-  BOARD_HEIGHT,
   BOARD_WIDTH,
   BOMB_SLIDE_SECONDS,
   BOMB_THROW_SECONDS,
@@ -13,7 +12,6 @@ import {
   GAME_MODES,
   MAX_BOMBS,
   MAX_BOMBS_LIMIT,
-  MAX_FIRE_RANGE,
   MAX_MOVE_SPEED,
   MOVE_SPEED,
   POWERUP_DROP_CHANCE,
@@ -25,7 +23,7 @@ import {
   VOID,
   WALL,
 } from "./constants.js";
-import { ARENA_TYPES, arenaTypeForPlayerCount, isArenaBoundary, isInsideArena, spawnsForArena } from "./arena.js";
+import { ARENA_TYPES, arenaDimensions, gridDimensions, arenaTypeForPlayerCount, isArenaBoundary, isInsideArena, spawnsForArena } from "./arena.js";
 
 const POWERUP_WEIGHTS = [
   ["fire", 22], ["bomb", 20], ["speed", 19], ["remote", 8], ["glove", 7],
@@ -44,14 +42,15 @@ export function seededRandom(seed) {
   };
 }
 
-export const indexOf = (x, y) => y * BOARD_WIDTH + x;
+export const indexOf = (x, y, width = BOARD_WIDTH) => y * width + x;
 export const tileAt = (grid, x, y) => {
-  if (x < 0 || y < 0 || x >= BOARD_WIDTH || y >= BOARD_HEIGHT) return undefined;
-  return grid[indexOf(x, y)];
+  const { width, height } = gridDimensions(grid);
+  if (x < 0 || y < 0 || x >= width || y >= height) return undefined;
+  return grid[indexOf(x, y, width)];
 };
 
 function setTile(state, x, y, value) {
-  const position = indexOf(x, y);
+  const position = indexOf(x, y, gridDimensions(state.grid).width);
   if (position < 0 || position >= state.grid.length) return;
   const mutable = state.grid.split("");
   mutable[position] = value;
@@ -60,7 +59,8 @@ function setTile(state, x, y, value) {
 
 export function createGrid(seed = Date.now(), { arenaType = ARENA_TYPES.SQUARE } = {}) {
   const random = seededRandom(seed);
-  const grid = Array(BOARD_WIDTH * BOARD_HEIGHT).fill(VOID);
+  const { width, height } = arenaDimensions(arenaType);
+  const grid = Array(width * height).fill(VOID);
   const clear = new Set();
   const crateChance = 0.64 + random() * 0.18;
   const spawns = spawnsForArena(arenaType);
@@ -74,14 +74,14 @@ export function createGrid(seed = Date.now(), { arenaType = ARENA_TYPES.SQUARE }
     }
   }
 
-  for (let y = 0; y < BOARD_HEIGHT; y += 1) {
-    for (let x = 0; x < BOARD_WIDTH; x += 1) {
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
       if (!isInsideArena(arenaType, x, y)) continue;
       const border = isArenaBoundary(arenaType, x, y);
       const pillar = !border && x % 2 === 0 && y % 2 === 0;
-      if (border || pillar) grid[indexOf(x, y)] = WALL;
-      else if (!clear.has(`${x},${y}`) && random() < crateChance) grid[indexOf(x, y)] = CRATE;
-      else grid[indexOf(x, y)] = EMPTY;
+      if (border || pillar) grid[indexOf(x, y, width)] = WALL;
+      else if (!clear.has(`${x},${y}`) && random() < crateChance) grid[indexOf(x, y, width)] = CRATE;
+      else grid[indexOf(x, y, width)] = EMPTY;
     }
   }
   return grid.join("");
@@ -363,7 +363,7 @@ function detonateBombs(state, initialIds) {
       const existing = state.blasts.find((blast) => `${blast.x},${blast.y}` === key);
       if (existing) existing.ttl = BLAST_SECONDS;
       else state.blasts.push({ ...tile, ttl: BLAST_SECONDS });
-      const wasCrate = state.grid[indexOf(tile.x, tile.y)] === CRATE;
+      const wasCrate = tileAt(state.grid, tile.x, tile.y) === CRATE;
       if (wasCrate) {
         setTile(state, tile.x, tile.y, EMPTY);
         maybeSpawnPowerup(state, tile.x, tile.y);
@@ -388,7 +388,7 @@ function applyBlastDamage(state) {
 }
 
 function applyPowerup(state, player, type) {
-  if (type === "fire") player.fireRange = Math.min(MAX_FIRE_RANGE, player.fireRange + 1);
+  if (type === "fire") player.fireRange = Math.min(Math.max(...Object.values(gridDimensions(state.grid))), player.fireRange + 1);
   else if (type === "bomb") player.maxBombs = Math.min(MAX_BOMBS_LIMIT, player.maxBombs + 1);
   else if (type === "speed") player.moveSpeed = Math.min(MAX_MOVE_SPEED, player.moveSpeed + SPEED_UP_AMOUNT);
   else if (type === "remote") player.remote = true;
@@ -397,7 +397,7 @@ function applyPowerup(state, player, type) {
   else if (type === "bombPass") player.bombPass = true;
   else if (type === "blockPass") player.blockPass = true;
   else if (type === "suit") player.invincibleUntilTick = state.tick + SUIT_SECONDS * TICK_RATE;
-  else if (type === "fullFire") player.fireRange = MAX_FIRE_RANGE;
+  else if (type === "fullFire") player.fireRange = Math.max(...Object.values(gridDimensions(state.grid)));
 }
 
 function collectPowerups(state, player) {
@@ -443,11 +443,12 @@ export function dropDeathBlock(state, x, y) {
 }
 
 export function createSuddenDeathOrder(grid) {
+  const { width, height } = gridDimensions(grid);
   const order = [];
   let left = 1;
-  let right = BOARD_WIDTH - 2;
+  let right = width - 2;
   let top = 1;
-  let bottom = BOARD_HEIGHT - 2;
+  let bottom = height - 2;
   const add = (x, y) => { if ([EMPTY, CRATE].includes(tileAt(grid, x, y))) order.push({ x, y }); };
   while (left <= right && top <= bottom) {
     for (let x = left; x <= right; x += 1) add(x, top);

@@ -12,6 +12,7 @@ export const FUSE_SECONDS = 1.95;
 export const BLAST_SECONDS = 0.4;
 export const ROOM_CAPACITY = 6;
 export const GAME_MODES = Object.freeze({ CLASSIC: "classic", SUPER: "super" });
+export const getRoomCapacity = (mode) => mode === GAME_MODES.SUPER ? ROOM_CAPACITY : 4;
 export const POWERUP_TYPES = Object.freeze([
   "fire",
   "bomb",

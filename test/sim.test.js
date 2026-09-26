@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { dangerDeadlines, decideBotInput, hasEscapeRoute } from "../shared/bots.js";
 import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, EMPTY, GAME_MODES, MAX_FIRE_RANGE, MOVE_SPEED, SPEED_UP_AMOUNT, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
-import { createGrid, createMatch, dropDeathBlock, forceDetonate, indexOf, snapshot, step } from "../shared/sim.js";
+import { createGrid, createMatch, dropDeathBlock, createSuddenDeathOrder, tileAt, forceDetonate, indexOf, snapshot, step } from "../shared/sim.js";
 
 function openGrid() {
   const grid = Array(BOARD_WIDTH * BOARD_HEIGHT).fill(EMPTY);
@@ -132,7 +132,7 @@ test("players cannot reserve the same destination when leaving an overlapped til
   const state = baseState();
   for (const player of state.players) {
     player.kind = "bot";
-    player.x = 5.5 * TILE_SIZE;
+    player.x = 7.5 * TILE_SIZE;
     player.y = 5.5 * TILE_SIZE;
     player.moveTarget = null;
   }
@@ -441,17 +441,18 @@ test("four or fewer players keep the classic square arena", () => {
   assert.notEqual(state.grid[indexOf(0, 0)], VOID);
 });
 
-test("more than four players create an explicit hexagonal arena mask", () => {
+test("more than four players create a larger rectangular arena", () => {
   const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
   const state = createMatch(77, slots);
-  assert.equal(state.arenaType, "hexagon");
-  assert.equal(state.grid[indexOf(0, 0)], VOID);
-  assert.equal(state.grid[indexOf(12, 0)], VOID);
-  assert.equal(state.grid[indexOf(5, 0)], WALL);
-  assert.notEqual(state.grid[indexOf(6, 1)], VOID);
+  assert.equal(state.arenaType, "rectangle");
+  assert.equal(tileAt(state.grid, 0, 0), WALL);
+  assert.ok(!state.grid.includes(VOID));
+  assert.equal(tileAt(state.grid, 22, 0), WALL);
+  assert.equal(tileAt(state.grid, 7, 0), WALL);
+  assert.notEqual(tileAt(state.grid, 8, 1), VOID);
 });
 
-test("movement stops at the hexagonal arena boundary", () => {
+test("movement stops at the rectangular arena boundary", () => {
   const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
   const state = createMatch(91, slots);
   state.bombs = [];
@@ -467,13 +468,50 @@ test("movement stops at the hexagonal arena boundary", () => {
   assert.equal(player.moveTarget, null);
 });
 
-test("bomb motion cannot cross invalid cells outside the hexagon", () => {
+test("bomb motion cannot cross invalid cells outside the rectangle", () => {
   const slots = Array.from({ length: 5 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}`, kind: "human" }));
   const state = createMatch(92, slots);
   state.grid = state.grid.split("").map((tile) => tile === CRATE ? EMPTY : tile).join("");
-  state.bombs = [{ ...bomb(99, 5, 1), slideDirection: { x: 0, y: -1 }, slideCooldown: 0 }];
+  state.bombs = [{ ...bomb(99, 7, 1), slideDirection: { x: 0, y: -1 }, slideCooldown: 0 }];
   step(state, {});
-  assert.equal(state.bombs[0].x, 5);
+  assert.equal(state.bombs[0].x, 7);
   assert.equal(state.bombs[0].y, 1);
   assert.equal(state.bombs[0].slideDirection, null);
+});
+
+
+test("large arena adds connected playable space and safe starts for five or six players", () => {
+  const playable = (grid) => [...grid].filter(tile => tile === EMPTY || tile === CRATE).length;
+  const classicArea = playable(createGrid(77));
+  for (const count of [5, 6]) {
+    const slots = Array.from({ length: count }, (_, slot) => ({ id: 'p' + slot, slot }));
+    const state = createMatch(77, slots, { mode: GAME_MODES.SUPER });
+    assert.equal(state.grid.length, 23 * 15);
+    assert.deepEqual(state.players.map(p => [Math.floor(p.x / TILE_SIZE), Math.floor(p.y / TILE_SIZE)]),
+      [[1,1], [21,13], [21,1], [1,13], [11,1], [11,13]].slice(0, count));
+    assert.ok([...state.grid].filter(t => t === WALL).length > [...createGrid(77)].filter(t => t === WALL).length);
+    assert.ok([...state.grid].filter(t => t === CRATE).length > [...createGrid(77)].filter(t => t === CRATE).length);
+    assert.ok(playable(state.grid) / count >= classicArea / 4);
+    const starts = state.players.map(p => ({ x: Math.floor(p.x / TILE_SIZE), y: Math.floor(p.y / TILE_SIZE) }));
+    assert.equal(new Set(starts.map(p => p.x + ',' + p.y)).size, count);
+    for (const p of starts) {
+      assert.equal(tileAt(state.grid, p.x, p.y), EMPTY);
+      const exits = [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy]) => tileAt(state.grid,p.x+dx,p.y+dy) === EMPTY);
+      assert.ok(exits.length >= 2);
+    }
+    const visited = new Set();
+    const queue = [starts[0]];
+    for (let i = 0; i < queue.length; i++) {
+      const { x, y } = queue[i];
+      const key = x + ',' + y;
+      if (visited.has(key) || ![EMPTY, CRATE].includes(tileAt(state.grid, x, y))) continue;
+      visited.add(key);
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) queue.push({ x: x+dx, y: y+dy });
+    }
+    assert.equal(visited.size, playable(state.grid));
+    const order = createSuddenDeathOrder(state.grid);
+    assert.equal(new Set(order.map(p => p.x + ',' + p.y)).size, playable(state.grid));
+    assert.ok(order.some(p => p.x > 12 && p.y > 10));
+    assert.equal(tileAt(state.grid, 23, 7), undefined);
+  }
 });
