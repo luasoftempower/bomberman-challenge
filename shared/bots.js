@@ -1,4 +1,5 @@
-import { BLAST_RANGE, BOARD_HEIGHT, BOARD_WIDTH, CRATE, DIRECTIONS, EMPTY, FUSE_SECONDS, MOVE_SPEED, TILE_SIZE, WALL } from "./constants.js";
+import { gridDimensions } from "./arena.js";
+import { BLAST_RANGE, CRATE, DIRECTIONS, EMPTY, FUSE_SECONDS, MOVE_SPEED, TILE_SIZE, VOID, WALL } from "./constants.js";
 import { indexOf, tileAt } from "./sim.js";
 
 const keyOf = (x, y) => `${x},${y}`;
@@ -10,7 +11,7 @@ function projectedBlastTiles(state, bomb, cratesBlock = false) {
       const x = bomb.x + direction.x * distance;
       const y = bomb.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
-      if (tile === WALL || tile === undefined) break;
+      if (tile === WALL || tile === VOID || tile === undefined) break;
       tiles.push({ x, y });
       if (cratesBlock && tile === CRATE) break;
     }
@@ -54,7 +55,7 @@ export function dangerTiles(state, extraBomb = null) {
 }
 
 function traversable(state, x, y, start, extraBlocked = null, player = null) {
-  if (x < 0 || y < 0 || x >= BOARD_WIDTH || y >= BOARD_HEIGHT) return false;
+
   const tile = tileAt(state.grid, x, y);
   if (tile !== EMPTY && !(tile === CRATE && player?.blockPass)) return false;
   if (extraBlocked && keyOf(x, y) === extraBlocked && keyOf(x, y) !== keyOf(start.x, start.y)) return false;
@@ -135,7 +136,7 @@ function usefulBombTarget(state, player, start) {
       const x = start.x + direction.x * distance;
       const y = start.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
-      if (tile === WALL || tile === undefined) break;
+      if (tile === WALL || tile === VOID || tile === undefined) break;
       if (tile === CRATE) return true;
       if (state.players.some((other) => other.alive && other.id !== player.id && Math.floor(other.x / TILE_SIZE) === x && Math.floor(other.y / TILE_SIZE) === y)) return true;
     }
@@ -179,8 +180,9 @@ export function decideBotInput(state, playerId, additionalReservations = new Set
   }
 
   const targets = new Set();
-  for (let y = 1; y < BOARD_HEIGHT - 1; y += 1) {
-    for (let x = 1; x < BOARD_WIDTH - 1; x += 1) {
+  const { width, height } = gridDimensions(state.grid);
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
       if (tileAt(state.grid, x, y) !== EMPTY || trafficBlocked.has(keyOf(x, y)) || (x === start.x && y === start.y)) continue;
       const candidate = { ...player, x: (x + 0.5) * TILE_SIZE, y: (y + 0.5) * TILE_SIZE, moveTarget: null };
       if (usefulBombTarget(state, candidate, { x, y }) && findEscapePath(state, candidate, { x, y })) targets.add(keyOf(x, y));

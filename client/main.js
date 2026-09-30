@@ -1,4 +1,7 @@
-import "./styles.css";
+// ============================================================
+// IMPORTAÇÕES
+// ============================================================
+
 import "./i18n/language.css";
 import "./settings-menu.css";
 // Componentes devolvem o HTML das partes da interface; utilitários concentram
@@ -6,57 +9,74 @@ import "./settings-menu.css";
 import { brand } from "./components/brand.js";
 import { landingMarkup, createRoomButtonContent } from "./components/landing.js";
 import { initializeMenuIntro } from "./components/menu-intro.js";
-import { escapeHtml } from "./utils/html.js";
-import { formatMatchTime } from "./utils/format-time.js";
 import { settingsMenu, initializeSettingsMenu } from "./settings-menu.js";
 import { t, text, attr, setText, initializeLanguage } from "./i18n/index.js";
-import { initializeAudio, playBombExplosionSound, playDeathSound, playDrawSound, playLuaSoftSound, playMatchCountdown, playWinSound, setMenuMusicActive, setWalkingSoundActive, startBattleTheme, stopMatchAudio } from "./audio.js";
+import { escapeHtml } from "./utils/html.js";
+import { formatMatchTime } from "./utils/format-time.js";
+import "./styles.css";
+
+import {
+  initializeAudio,
+  playBombExplosionSound,
+  playDeathSound,
+  playDrawSound,
+  playLuaSoftSound,
+  playMatchCountdown,
+  playWinSound,
+  setMenuMusicActive,
+  setWalkingSoundActive,
+  startBattleTheme,
+  stopMatchAudio,
+} from "./audio.js";
+
 import { createInputController } from "./input.js";
 import { reconcileLocalPlayer } from "./netcode.js";
-import { renderGame, startMenuMascotAnimation, startResultCharacterAnimation, startVictoryAnimation } from "./render.js";
-import { GAME_MODES, MOVE_SPEED, PLAYER_COLORS } from "../shared/constants.js";
 
-const root = document.querySelector("#app");
-initializeAudio();
+import {
+  renderGame,
+  startMenuMascotAnimation,
+  startResultCharacterAnimation,
+  startVictoryAnimation,
+} from "./render.js";
+
+import {
+  GAME_MODES,
+  MOVE_SPEED,
+  PLAYER_COLORS,
+  ROOM_CAPACITY,
+  getRoomCapacity,
+} from "../shared/constants.js";
+
 // Registra os eventos de idioma e menu uma vez. Eles continuam ativos quando
 // as telas são substituídas, pois usam delegação de eventos no document.
 initializeLanguage();
 initializeSettingsMenu();
-const roomFromPath = () => location.pathname.match(/^\/r\/([A-Z2-9]{6})\/?$/i)?.[1]?.toUpperCase();
-const getName = () => localStorage.getItem("blast-name") || t("common.defaultName");
 
-let socket;
-let player = null;
-let latestSnapshot = null;
-let stopInput = null;
-let errorShown = false;
-let displaySnapshot = null;
-let animationFrame = null;
-let lastFrameAt = 0;
-let lastHudSignature = "";
-let stopVictoryLoop = null;
-let resultTimers = [];
-let stopMenuMascotLoop = null;
-let introShown = false;
-let roomTransitionStartedAt = 0;
-let pendingLobby = null;
-let lobbyRevealTimer = null;
-let lobbyMounted = false;
-let lastLobbyGameMode = null;
-let matchIntroTimers = [];
-let localInput = { dx: 0, dy: 0, drop: false, detonate: false, special: false };
-let latestSnapshotReceivedAt = 0;
-let estimatedRtt = 0;
-let rttSamples = [];
-let latencyTimer = null;
+// ============================================================
+// CONFIGURAÇÕES
+// ============================================================
 
+// Elemento principal onde as telas do jogo são renderizadas.
+const root = document.querySelector("#app");
+
+// Limite da predição visual utilizada no multiplayer.
 const MAX_PREDICTION_MS = 220;
+
+// Tempo da transição entre lobby e partida.
 const MATCH_TRANSITION_MS = 680;
+
+// Tempos das animações da tela de resultado.
 const WIN_SOUND_MUSIC_CUE_MS = 4150;
 const RESULT_BOARD_REVEAL_MS = 1250;
 const DRAW_BOARD_REVEAL_MS = 2800;
 const TROPHY_ANIMATION_DELAY_MS = 520;
-const TROPHY_ANIMATION_DURATION_MS = WIN_SOUND_MUSIC_CUE_MS - RESULT_BOARD_REVEAL_MS - TROPHY_ANIMATION_DELAY_MS;
+
+const TROPHY_ANIMATION_DURATION_MS =
+  WIN_SOUND_MUSIC_CUE_MS -
+  RESULT_BOARD_REVEAL_MS -
+  TROPHY_ANIMATION_DELAY_MS;
+
+// Informações das habilidades mostradas no HUD.
 const ABILITY_META = {
   remote: ["R", "ability.remote"],
   glove: ["G", "ability.glove"],
@@ -65,130 +85,395 @@ const ABILITY_META = {
   blockPass: ["CP", "ability.blockPass"],
 };
 
+
+
+// ============================================================
+// ESTADO GLOBAL DA APLICAÇÃO
+// ============================================================
+
+// Conexão com o servidor.
+let socket;
+
+// Informações do jogador local.
+let player = null;
+
+// Último estado da partida recebido do servidor.
+let latestSnapshot = null;
+
+// Snapshot utilizado para desenhar movimentos suavemente.
+let displaySnapshot = null;
+
+// Controle de entrada do jogador.
+let stopInput = null;
+
+let localInput = {
+  dx: 0,
+  dy: 0,
+  drop: false,
+  detonate: false,
+  special: false,
+};
+
+// Controle da renderização.
+let animationFrame = null;
+let lastFrameAt = 0;
+
+// Evita reconstruir o HUD quando nada relevante mudou.
+let lastHudSignature = "";
+
+// Controle das animações.
+let stopVictoryLoop = null;
+let stopMenuMascotLoop = null;
+
+// Timers das telas e animações.
+let resultTimers = [];
+let matchIntroTimers = [];
+let lobbyRevealTimer = null;
+
+// Estados do menu/lobby.
+let errorShown = false;
+let introShown = false;
+let roomTransitionStartedAt = 0;
+let pendingLobby = null;
+let lobbyMounted = false;
+let lastLobbyGameMode = null;
+
+// Informações de latência da conexão.
+let latestSnapshotReceivedAt = 0;
+let estimatedRtt = 0;
+let rttSamples = [];
+let latencyTimer = null;
+
+
+// ============================================================
+// FUNÇÕES UTILITÁRIAS
+// ============================================================
+
+/**
+ * Obtém o código da sala através da URL.
+ * Exemplo:
+ * /r/ABC123 -> ABC123
+ */
+const roomFromPath = () =>
+  location.pathname
+    .match(/^\/r\/([A-Z2-9]{6})\/?$/i)?.[1]
+    ?.toUpperCase();
+
+
+/**
+ * Recupera o nome salvo anteriormente no navegador.
+ */
+const getName = () => localStorage.getItem("blast-name") || t("common.defaultName");
+
+// ============================================================
+// CONTROLE DE ANIMAÇÕES E TRANSIÇÕES
+// ============================================================
+
+/**
+ * Para animações e timers relacionados à tela de vitória.
+ */
 function stopVictory() {
   stopVictoryLoop?.();
   stopVictoryLoop = null;
-  for (const timer of resultTimers) clearTimeout(timer);
+
+  for (const timer of resultTimers) {
+    clearTimeout(timer);
+  }
+
   resultTimers = [];
 }
 
+/**
+ * Para a animação do personagem do menu.
+ */
 function stopMenuMascot() {
   stopMenuMascotLoop?.();
   stopMenuMascotLoop = null;
 }
 
+/**
+ * Limpa a transição de entrada/retorno da sala.
+ */
 function clearRoomTransition() {
   clearTimeout(lobbyRevealTimer);
+
   lobbyRevealTimer = null;
   roomTransitionStartedAt = 0;
   pendingLobby = null;
 }
 
+/**
+ * Para os timers da introdução da partida.
+ */
 function stopMatchIntro() {
-  for (const timer of matchIntroTimers) clearTimeout(timer);
+  for (const timer of matchIntroTimers) {
+    clearTimeout(timer);
+  }
+
   matchIntroTimers = [];
 }
 
+
+// ============================================================
+// SNAPSHOTS E RENDERIZAÇÃO EM TEMPO REAL
+// ============================================================
+
+/**
+ * Cria uma cópia segura do snapshot.
+ *
+ * O moveTarget também precisa ser copiado para não alterar
+ * diretamente os dados recebidos do servidor.
+ */
 function copySnapshot(state) {
-  return state ? {
+  if (!state) {
+    return null;
+  }
+
+  return {
     ...state,
+
     players: state.players.map((candidate) => ({
       ...candidate,
-      moveTarget: candidate.moveTarget ? { ...candidate.moveTarget } : null,
+
+      moveTarget: candidate.moveTarget
+        ? { ...candidate.moveTarget }
+        : null,
     })),
-  } : null;
+  };
 }
 
-function updateLocalDisplay(current, target, state, elapsed, predictionMs) {
-  Object.assign(current, reconcileLocalPlayer(current, target, state, localInput, elapsed, predictionMs));
+/**
+ * Atualiza visualmente o jogador local utilizando
+ * reconciliação/predição de movimento.
+ */
+function updateLocalDisplay(
+  current,
+  target,
+  state,
+  elapsed,
+  predictionMs,
+) {
+  Object.assign(
+    current,
+    reconcileLocalPlayer(
+      current,
+      target,
+      state,
+      localInput,
+      elapsed,
+      predictionMs,
+    ),
+  );
 }
 
+/**
+ * Inicia o loop principal de renderização.
+ *
+ * Jogador local:
+ * utiliza predição/reconciliação.
+ *
+ * Outros jogadores:
+ * utilizam suavização/interpolação.
+ */
 function startRenderLoop() {
   cancelAnimationFrame(animationFrame);
+
   lastFrameAt = performance.now();
+
   const frame = (now) => {
     const elapsed = Math.min(50, now - lastFrameAt);
     lastFrameAt = now;
+
     const canvas = root.querySelector("canvas");
+
     if (canvas && latestSnapshot) {
-      if (!displaySnapshot) displaySnapshot = copySnapshot(latestSnapshot);
+      if (!displaySnapshot) {
+        displaySnapshot = copySnapshot(latestSnapshot);
+      }
+
       const smoothing = 1 - Math.exp(-elapsed * 0.028);
-      const snapshotAge = latestSnapshotReceivedAt ? now - latestSnapshotReceivedAt : 0;
-      const predictionMs = Math.min(MAX_PREDICTION_MS, Math.max(0, snapshotAge) + estimatedRtt / 2);
-      const displayById = new Map(displaySnapshot.players.map((candidate) => [candidate.id, candidate]));
+
+      const snapshotAge = latestSnapshotReceivedAt
+        ? now - latestSnapshotReceivedAt
+        : 0;
+
+      const predictionMs = Math.min(
+        MAX_PREDICTION_MS,
+        Math.max(0, snapshotAge) + estimatedRtt / 2,
+      );
+
+      const displayById = new Map(
+        displaySnapshot.players.map((candidate) => [
+          candidate.id,
+          candidate,
+        ]),
+      );
+
       const players = latestSnapshot.players.map((target) => {
-        const current = displayById.get(target.id) || { ...target };
+        const current =
+          displayById.get(target.id) || { ...target };
+
+        // Jogador local.
         if (target.id === player?.playerId) {
-          updateLocalDisplay(current, target, latestSnapshot, elapsed, predictionMs);
+          updateLocalDisplay(
+            current,
+            target,
+            latestSnapshot,
+            elapsed,
+            predictionMs,
+          );
+
           const displayX = current.x;
           const displayY = current.y;
           const displayFacing = current.facing;
-          const displayMoveTarget = current.moveTarget ? { ...current.moveTarget } : null;
-          Object.assign(current, target, { x: displayX, y: displayY, facing: displayFacing, moveTarget: displayMoveTarget });
-        } else {
+
+          const displayMoveTarget = current.moveTarget
+            ? { ...current.moveTarget }
+            : null;
+
+          Object.assign(current, target, {
+            x: displayX,
+            y: displayY,
+            facing: displayFacing,
+            moveTarget: displayMoveTarget,
+          });
+        }
+
+        // Outros jogadores.
+        else {
           current.x += (target.x - current.x) * smoothing;
           current.y += (target.y - current.y) * smoothing;
+
           const displayX = current.x;
           const displayY = current.y;
           const displayFacing = current.facing;
-          Object.assign(current, target, { x: displayX, y: displayY, facing: displayFacing });
+
+          Object.assign(current, target, {
+            x: displayX,
+            y: displayY,
+            facing: displayFacing,
+          });
         }
+
         return current;
       });
-      displaySnapshot = { ...latestSnapshot, players };
+
+      displaySnapshot = {
+        ...latestSnapshot,
+        players,
+      };
+
       renderGame(canvas, displaySnapshot);
     }
+
     animationFrame = requestAnimationFrame(frame);
   };
+
   animationFrame = requestAnimationFrame(frame);
 }
 
+/**
+ * Para o loop de renderização da partida.
+ */
 function stopRenderLoop() {
   cancelAnimationFrame(animationFrame);
+
   animationFrame = null;
   displaySnapshot = null;
 }
 
+
+// ============================================================
+// MENU PRINCIPAL
+// ============================================================
+
+/**
+ * Renderiza a tela inicial do Bomberlan.
+ */
 function renderLanding() {
   setMenuMusicActive(true);
+
   stopVictory();
   stopMenuMascot();
   clearRoomTransition();
   stopMatchIntro();
+
   const showIntro = !introShown;
+
   lastLobbyGameMode = null;
   introShown = true;
   player = null;
+
   // Entrega ao componente apenas os dados usados para montar a página inicial.
   // O nome salvo é preservado; somente o nome padrão vem do dicionário de idioma.
   root.innerHTML = landingMarkup({ showIntro, playerName: getName() });
 
   // O canvas e o botão de início já existem no DOM após a montagem acima.
-  stopMenuMascotLoop = startMenuMascotAnimation(root.querySelector("#menu-mascot-canvas"));
+
+  // Animação do personagem presente no menu.
+  stopMenuMascotLoop = startMenuMascotAnimation(
+    root.querySelector("#menu-mascot-canvas"),
+  );
+
   // Passa a função de áudio sem executá-la: a abertura a chama no momento adequado.
   if (showIntro) initializeMenuIntro(root, playLuaSoftSound);
 
-  root.querySelector("#create-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const button = event.submitter;
-    button.disabled = true;
-    button.innerHTML = text("menu.preparing");
-    const name = saveName();
-    try {
-      const response = await fetch("/api/rooms", { method: "POST" });
-      if (!response.ok) throw new Error(t("error.create"));
-      const data = await response.json();
-      sessionStorage.setItem(`blast-host-${data.roomCode}`, data.hostToken);
-      history.pushState({}, "", data.path);
-      connectToRoom(data.roomCode, name, data.hostToken);
-    } catch {
-      root.querySelector("#form-error").innerHTML = text("error.retry");
-      button.disabled = false;
-      // Reutiliza o conteúdo original no idioma atual, permitindo tentar novamente.
-      button.innerHTML = createRoomButtonContent();
-    }
-  });
-  root.querySelector("#join-button").addEventListener("click", joinFromLanding);
+  // Criação de uma nova sala.
+  root
+    .querySelector("#create-form")
+    .addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const button = event.submitter;
+
+      button.disabled = true;
+      button.innerHTML = text("menu.preparing");
+
+      const name = saveName();
+
+      try {
+        const response = await fetch("/api/rooms", {
+          method: "POST",
+        });
+
+        if (!response.ok) throw new Error(t("error.create"));
+
+        const data = await response.json();
+
+        sessionStorage.setItem(
+          `blast-host-${data.roomCode}`,
+          data.hostToken,
+        );
+
+        history.pushState(
+          {},
+          "",
+          data.path,
+        );
+
+        connectToRoom(
+          data.roomCode,
+          name,
+          data.hostToken,
+        );
+      } catch {
+        root.querySelector("#form-error").innerHTML = text("error.retry");
+
+        button.disabled = false;
+
+        // Reutiliza o conteúdo original no idioma atual, permitindo tentar novamente.
+        button.innerHTML = createRoomButtonContent();
+      }
+    });
+
+  // Entrada através de código.
+  root
+    .querySelector("#join-button")
+    .addEventListener(
+      "click",
+      joinFromLanding,
+    );
+
   root.querySelector("#room-code").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       // Enter no campo de código deve entrar na sala, e não enviar o formulário
@@ -199,40 +484,349 @@ function renderLanding() {
   });
 }
 
+/**
+ * Salva o nome do jogador no navegador.
+ */
 function saveName() {
   const name = (root.querySelector("#player-name")?.value || getName()).trim().slice(0, 16) || t("common.defaultName");
   localStorage.setItem("blast-name", name);
   return name;
 }
 
+/**
+ * Entra em uma sala utilizando o código informado no menu.
+ */
 function joinFromLanding() {
   const code = root.querySelector("#room-code").value.trim().toUpperCase();
-  if (!/^[A-Z2-9]{6}$/.test(code)) {
-    // Mostra um erro traduzível e encerra antes de mudar a URL ou tentar conectar.
-    root.querySelector("#form-error").innerHTML = text("error.code");
-    return;
-  }
+  if (!/^[A-Z2-9]{6}$/.test(code)) { root.querySelector("#form-error").innerHTML = text("error.code"); return; }
   const name = saveName();
   history.pushState({}, "", `/r/${code}`);
   connectToRoom(code, name);
 }
 
+/**
+ * Tela exibida quando o jogador entra diretamente
+ * através de um link de convite.
+ */
 function renderDirectJoin(code) {
   setMenuMusicActive(true);
   root.innerHTML = `<main class="center-shell"><nav>${brand()}${settingsMenu()}</nav><form class="compact-card" id="direct-join"><div class="card-kicker">${text("common.room", { code })}</div><h2>${text("join.invited")}</h2><p>${text("join.description")}</p><label for="player-name">${text("join.name")}</label><input id="player-name" maxlength="16" autocomplete="nickname" value="${escapeHtml(getName())}" required /><button class="primary" type="submit">${text("join.enter")} <span>→</span></button><a href="/" class="text-link">${text("common.back")}</a></form></main>`;
   root.querySelector("#direct-join").addEventListener("submit", (event) => { event.preventDefault(); connectToRoom(code, saveName(), sessionStorage.getItem(`blast-host-${code}`)); });
 }
 
+/**
+ * Mostra a tela enquanto a conexão com a sala é criada.
+ */
 function renderConnecting(code) {
   setMenuMusicActive(true);
   root.innerHTML = `<main class="room-transition"><div class="settings-corner">${settingsMenu()}</div><div class="transition-grid" aria-hidden="true"></div><div class="transition-radar" aria-hidden="true"><i></i><i></i><i></i></div><section class="transition-content" role="status"><span class="transition-kicker">${text("common.room", { code })}</span><div class="transition-logo"><i aria-hidden="true"></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="transition-copy"><b>${text("transition.opening")}</b><span>${text("transition.sync")}</span></div><div class="transition-track"><i></i></div></section><div class="transition-tip"><span>●</span> ${text("transition.explosion")}</div></main>`;
 }
 
+
+// ============================================================
+// CONEXÃO COM O SERVIDOR
+// ============================================================
+
+/**
+ * Abre a conexão WebSocket e solicita entrada na sala.
+ */
+function connectToRoom(
+  code,
+  name,
+  hostToken = null,
+) {
+  clearInterval(latencyTimer);
+
+  latencyTimer = null;
+  estimatedRtt = 0;
+  rttSamples = [];
+
+  clearRoomTransition();
+
+  lobbyMounted = false;
+  roomTransitionStartedAt = performance.now();
+
+  renderConnecting(code);
+
+  errorShown = false;
+
+  const protocol =
+    location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
+
+  socket = new WebSocket(
+    `${protocol}//${location.host}/ws`,
+  );
+
+  socket.addEventListener(
+    "open",
+    () => {
+      socket.send(
+        JSON.stringify({
+          type: "join",
+          roomCode: code,
+          name,
+          hostToken,
+        }),
+      );
+    },
+  );
+
+  socket.addEventListener(
+    "message",
+    (event) => {
+      handleMessage(
+        JSON.parse(event.data),
+      );
+    },
+  );
+
+  socket.addEventListener(
+    "close",
+    () => {
+      clearInterval(latencyTimer);
+
+      latencyTimer = null;
+
+      if (!errorShown && player) {
+        showToast(
+          "error.connection",
+          true,
+        );
+      }
+    },
+  );
+}
+
+/**
+ * Envia uma mensagem para o servidor.
+ */
+function send(message) {
+  if (
+    socket?.readyState ===
+    WebSocket.OPEN
+  ) {
+    socket.send(
+      JSON.stringify(message),
+    );
+  }
+}
+
+/**
+ * Mede periodicamente a latência entre cliente e servidor.
+ */
+function startLatencyMonitoring() {
+  clearInterval(latencyTimer);
+
+  const ping = () => {
+    send({
+      type: "ping",
+      clientTime: Date.now(),
+    });
+  };
+
+  ping();
+
+  latencyTimer = setInterval(
+    ping,
+    2000,
+  );
+}
+
+/**
+ * Processa todas as mensagens recebidas pelo WebSocket.
+ */
+function handleMessage(message) {
+  // Jogador entrou na sala.
+  if (message.type === "joined") {
+    player = message;
+    startLatencyMonitoring();
+  }
+
+  // Resposta do servidor utilizada para calcular latência.
+  else if (message.type === "pong") {
+    const sample =
+      Date.now() -
+      Number(message.clientTime);
+
+    if (
+      Number.isFinite(sample) &&
+      sample >= 0 &&
+      sample < 5000
+    ) {
+      rttSamples.push(sample);
+
+      if (rttSamples.length > 12) {
+        rttSamples.shift();
+      }
+
+      /*
+       * O menor RTT recente representa melhor
+       * a latência real de transporte.
+       *
+       * Picos causados por filas não devem aumentar
+       * demais a predição visual.
+       */
+      estimatedRtt =
+        Math.min(...rttSamples);
+    }
+  }
+
+  // Retorno para o lobby depois de uma partida.
+  else if (
+    message.type === "lobbyReturn"
+  ) {
+    renderLobbyReturnTransition(
+      message,
+    );
+  }
+
+  // Atualização do lobby.
+  else if (
+    message.type === "lobby"
+  ) {
+    queueLobbyReveal(message);
+  }
+
+  // Início da partida.
+  else if (
+    message.type === "matchStart"
+  ) {
+    transitionToMatch(message);
+  }
+
+  // Novo estado da partida.
+  else if (
+    message.type === "snapshot"
+  ) {
+    playSnapshotEffects(
+      latestSnapshot,
+      message,
+    );
+
+    latestSnapshot = message;
+
+    latestSnapshotReceivedAt =
+      performance.now();
+
+    updateHud(message);
+  }
+
+  // Fim da partida.
+  else if (
+    message.type === "matchEnd"
+  ) {
+    renderResult(
+      message.winnerSlot,
+      message.standings || [],
+      message.reason,
+    );
+  }
+
+  // Atualização do anfitrião.
+  else if (
+    message.type === "host"
+  ) {
+    player.isHost =
+      message.hostId ===
+      player.playerId;
+  }
+
+  // Erro retornado pelo servidor.
+  else if (
+    message.type === "error"
+  ) {
+    renderError(message);
+  }
+}
+
+/**
+ * Detecta eventos comparando o snapshot anterior
+ * com o snapshot atual e toca os efeitos necessários.
+ */
+function playSnapshotEffects(
+  previous,
+  current,
+) {
+  if (
+    !previous?.players ||
+    !current?.players
+  ) {
+    return;
+  }
+
+  // Detecta bombas que desapareceram.
+  const currentBombIds = new Set(
+    (current.bombs || []).map(
+      (bomb) => bomb.id,
+    ),
+  );
+
+  if (
+    (previous.bombs || []).some(
+      (bomb) =>
+        !currentBombIds.has(bomb.id),
+    )
+  ) {
+    playBombExplosionSound();
+  }
+
+  // Detecta morte de jogadores.
+  if (
+    previous.players.some(
+      (oldPlayer) =>
+        oldPlayer.alive &&
+        current.players.some(
+          (nextPlayer) =>
+            nextPlayer.id ===
+              oldPlayer.id &&
+            !nextPlayer.alive,
+        ),
+    )
+  ) {
+    playDeathSound();
+  }
+
+  const oldSelf =
+    previous.players.find(
+      (candidate) =>
+        candidate.id ===
+        player?.playerId,
+    );
+
+  const nextSelf =
+    current.players.find(
+      (candidate) =>
+        candidate.id ===
+        player?.playerId,
+    );
+
+  const moved = Boolean(
+    oldSelf?.alive &&
+      nextSelf?.alive &&
+      (
+        oldSelf.x !== nextSelf.x ||
+        oldSelf.y !== nextSelf.y
+      ),
+  );
+
+  setWalkingSoundActive(moved);
+}
+
+
+// ============================================================
+// LOBBY
+// ============================================================
+
+/**
+ * Transição exibida quando uma rodada termina
+ * e os jogadores retornam para o lobby.
+ */
 function renderLobbyReturnTransition(message) {
   stopVictory();
   stopMatchAudio();
   setMenuMusicActive(true);
-  stopVictory();
   stopMatchIntro();
   stopInput?.();
   stopInput = null;
@@ -244,53 +838,53 @@ function renderLobbyReturnTransition(message) {
   root.innerHTML = `<main class="room-transition return-transition"><div class="settings-corner">${settingsMenu()}</div><div class="transition-grid" aria-hidden="true"></div><div class="transition-radar" aria-hidden="true"><i></i><i></i><i></i></div><section class="transition-content" role="status"><span class="transition-kicker">${text("transition.finished")}</span><div class="transition-logo"><i aria-hidden="true"></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="transition-copy"><b>${text("transition.returning")}</b><span>${text("transition.regroup")}</span></div><div class="return-roster">${roster}</div><div class="transition-track"><i style="animation-duration:${Math.max(800, Number(message?.transitionMs) || 1320) - 170}ms"></i></div></section><div class="transition-tip"><span>●</span> ${text("transition.rematch")}</div></main>`;
 }
 
-function connectToRoom(code, name, hostToken = null) {
-  clearInterval(latencyTimer);
-  latencyTimer = null;
-  estimatedRtt = 0;
-  rttSamples = [];
-  clearRoomTransition();
-  lobbyMounted = false;
-  roomTransitionStartedAt = performance.now();
-  renderConnecting(code);
-  errorShown = false;
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  socket = new WebSocket(`${protocol}//${location.host}/ws`);
-  socket.addEventListener("open", () => socket.send(JSON.stringify({ type: "join", roomCode: code, name, hostToken })));
-  socket.addEventListener("message", (event) => handleMessage(JSON.parse(event.data)));
-  socket.addEventListener("close", () => {
-    clearInterval(latencyTimer);
-    latencyTimer = null;
-    if (!errorShown && player) showToast("error.connection", true);
-  });
-}
-
-function send(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
-
-function startLatencyMonitoring() {
-  clearInterval(latencyTimer);
-  const ping = () => send({ type: "ping", clientTime: Date.now() });
-  ping();
-  latencyTimer = setInterval(ping, 2000);
-}
-
+/**
+ * Aguarda a animação de conexão terminar
+ * antes de revelar o lobby.
+ */
 function queueLobbyReveal(lobby) {
   if (!roomTransitionStartedAt) {
     renderLobby(lobby);
     return;
   }
+
   pendingLobby = lobby;
-  if (lobbyRevealTimer) return;
-  const remaining = Math.max(0, 1320 - (performance.now() - roomTransitionStartedAt));
-  lobbyRevealTimer = setTimeout(() => {
-    lobbyRevealTimer = null;
-    roomTransitionStartedAt = 0;
-    const nextLobby = pendingLobby;
-    pendingLobby = null;
-    if (nextLobby) renderLobby(nextLobby);
-  }, remaining);
+
+  if (lobbyRevealTimer) {
+    return;
+  }
+
+  const remaining = Math.max(
+    0,
+    1320 -
+      (
+        performance.now() -
+        roomTransitionStartedAt
+      ),
+  );
+
+  lobbyRevealTimer = setTimeout(
+    () => {
+      lobbyRevealTimer = null;
+      roomTransitionStartedAt = 0;
+
+      const nextLobby =
+        pendingLobby;
+
+      pendingLobby = null;
+
+      if (nextLobby) {
+        renderLobby(nextLobby);
+      }
+    },
+    remaining,
+  );
 }
 
+/**
+ * Faz a animação de saída do lobby
+ * antes de abrir a arena.
+ */
 function transitionToMatch(start) {
   const lobbyShell = root.querySelector(".lobby-shell");
   if (!lobbyShell) {
@@ -308,43 +902,10 @@ function transitionToMatch(start) {
   }, MATCH_TRANSITION_MS));
 }
 
-function handleMessage(message) {
-  if (message.type === "joined") { player = message; startLatencyMonitoring(); }
-  else if (message.type === "pong") {
-    const sample = Date.now() - Number(message.clientTime);
-    if (Number.isFinite(sample) && sample >= 0 && sample < 5000) {
-      rttSamples.push(sample);
-      if (rttSamples.length > 12) rttSamples.shift();
-      // The lowest recent RTT best represents transport latency; queueing spikes
-      // should not push visual prediction farther ahead and cause later rollback.
-      estimatedRtt = Math.min(...rttSamples);
-    }
-  }
-  else if (message.type === "lobbyReturn") renderLobbyReturnTransition(message);
-  else if (message.type === "lobby") queueLobbyReveal(message);
-  else if (message.type === "matchStart") transitionToMatch(message);
-  else if (message.type === "snapshot") {
-    playSnapshotEffects(latestSnapshot, message);
-    latestSnapshot = message;
-    latestSnapshotReceivedAt = performance.now();
-    updateHud(message);
-  }
-  else if (message.type === "matchEnd") renderResult(message.winnerSlot, message.standings || [], message.reason);
-  else if (message.type === "host") player.isHost = message.hostId === player.playerId;
-  else if (message.type === "error") renderError(message);
-}
-
-function playSnapshotEffects(previous, current) {
-  if (!previous?.players || !current?.players) return;
-  const currentBombIds = new Set((current.bombs || []).map((bomb) => bomb.id));
-  if ((previous.bombs || []).some((bomb) => !currentBombIds.has(bomb.id))) playBombExplosionSound();
-  if (previous.players.some((oldPlayer) => oldPlayer.alive && current.players.some((nextPlayer) => nextPlayer.id === oldPlayer.id && !nextPlayer.alive))) playDeathSound();
-  const oldSelf = previous.players.find((candidate) => candidate.id === player?.playerId);
-  const nextSelf = current.players.find((candidate) => candidate.id === player?.playerId);
-  const moved = Boolean(oldSelf?.alive && nextSelf?.alive && (oldSelf.x !== nextSelf.x || oldSelf.y !== nextSelf.y));
-  setWalkingSoundActive(moved);
-}
-
+/**
+ * Renderiza o lobby e todas as opções
+ * disponíveis antes da partida.
+ */
 function renderLobby(lobby) {
   setMenuMusicActive(true, lobby.gameMode);
   stopVictory();
@@ -358,6 +919,10 @@ function renderLobby(lobby) {
   const ownSlot = lobby.slots.find((slot) => slot.id === player.playerId);
   const roomUrl = `${location.origin}/r/${player.roomCode}`;
   const onlineCount = lobby.slots.filter((slot) => slot.kind === "human").length;
+  const capacity = getRoomCapacity(lobby.gameMode);
+  const occupiedCount = lobby.slots.filter((slot) => slot.kind !== "empty").length;
+  const canUseClassic = occupiedCount <= getRoomCapacity(GAME_MODES.CLASSIC);
+  const hasManualBots = lobby.slots.some((slot) => slot.kind === "bot" && slot.manual);
   const firstLobbyRender = !lobbyMounted;
   const botDifficulty = ["easy", "normal", "hard"].includes(lobby.botDifficulty) ? lobby.botDifficulty : "normal";
   const difficultyOptions = [
@@ -372,13 +937,27 @@ function renderLobby(lobby) {
   const modeChanged = lobbyMounted && lastLobbyGameMode && lastLobbyGameMode !== gameMode;
   const switchDirection = modeChanged ? (gameMode === GAME_MODES.SUPER ? "switch-to-super" : "switch-to-classic") : "";
   lastLobbyGameMode = gameMode;
-  const modePanel = `<section class="mode-panel"><header><span>${text("mode.rules")}</span><b>${text("mode.choose")}</b><small>${isHost ? text("mode.hostRules") : text("mode.guestRules")}</small></header><div class="mode-options" role="group" ${attr("aria-label", "mode.label")}><button type="button" data-game-mode="classic" class="mode-card classic ${gameMode === GAME_MODES.CLASSIC ? "active" : ""}" aria-pressed="${gameMode === GAME_MODES.CLASSIC}" ${isHost ? "" : "disabled"}><i class="mode-icon">B</i><span><strong>BOMBERLAN</strong><small>${text("mode.classicItems")}</small><em>${text("mode.classicDescription")}</em></span><b>${text("mode.classic")}</b></button><button type="button" data-game-mode="super" class="mode-card super ${gameMode === GAME_MODES.SUPER ? "active" : ""}" aria-pressed="${gameMode === GAME_MODES.SUPER}" ${isHost ? "" : "disabled"}><i class="mode-icon">S</i><span><strong>SUPER BOMBERLAN</strong><small>${text("mode.superItems")}</small><em>${text("mode.superDescription")}</em></span><b>SUPER</b></button></div></section>`;
+  const modePanel = `<section class="mode-panel"><header><span>${text("mode.rules")}</span><b>${text("mode.choose")}</b><small>${isHost ? text("mode.hostRules") : text("mode.guestRules")}</small></header><div class="mode-options" role="group" ${attr("aria-label", "mode.label")}><button type="button" data-game-mode="classic" class="mode-card classic ${gameMode === GAME_MODES.CLASSIC ? "active" : ""}" aria-pressed="${gameMode === GAME_MODES.CLASSIC}" ${isHost && canUseClassic ? "" : "disabled"}><i class="mode-icon">B</i><span><strong>BOMBERLAN</strong><small>${text("mode.classicItems")}</small><em>${text("mode.classicDescription")} · ${text("mode.capacity", { capacity: getRoomCapacity(GAME_MODES.CLASSIC) })}</em></span><b>${text("mode.classic")}</b></button><button type="button" data-game-mode="super" class="mode-card super ${gameMode === GAME_MODES.SUPER ? "active" : ""}" aria-pressed="${gameMode === GAME_MODES.SUPER}" ${isHost ? "" : "disabled"}><i class="mode-icon">S</i><span><strong>SUPER BOMBERLAN</strong><small>${text("mode.superItems")}</small><em>${text("mode.superDescription")} · ${text("mode.capacity", { capacity: getRoomCapacity(GAME_MODES.SUPER) })}</em></span><b>SUPER</b></button></div></section>`;
+  const botControlPanel = isHost ? `
+    <section class="bot-control-panel">
+      <header><span>${text("bots.team")}</span><b>${text("bots.title")}</b></header>
+      <div class="bot-control-buttons">
+        <button type="button" id="add-bot-button" ${occupiedCount >= capacity ? "disabled" : ""}>${text("bots.add")}</button>
+        <button type="button" id="remove-bot-button" ${hasManualBots ? "" : "disabled"}>${text("bots.remove")}</button>
+      </div>
+      <p>${text("bots.help", { capacity })}</p>
+    </section>` : "";
   lobbyMounted = true;
   const squadPreview = lobby.slots.map((slot) => slot.kind === "empty"
     ? `<i class="squad-empty" aria-hidden="true">+</i>`
     : `<img src="/player-avatar-${slot.slot + 1}.png" alt="${escapeHtml(slot.name)}" />`).join("");
-  root.innerHTML = `<main class="lobby-shell ${firstLobbyRender ? "lobby-entering" : ""} ${gameMode === GAME_MODES.SUPER ? "super-lobby" : ""} ${modeChanged ? `mode-switching ${switchDirection}` : ""}"><div class="lobby-backdrop" aria-hidden="true"><i></i><i></i><i></i></div><nav class="lobby-nav">${brand()}${settingsMenu()}<div class="room-chip"><i></i><span>${text("lobby.active")}</span><b>${escapeHtml(player.roomCode)}</b></div></nav><section class="lobby-heading"><div class="lobby-heading-copy"><div class="eyebrow"><span>●</span> ${text("lobby.waitingRoom")}</div><h2>${text("lobby.build")}<br><strong>${text("lobby.squad")}</strong></h2><p>${isHost ? text("lobby.hostDescription") : text("lobby.guestDescription")}</p></div><aside class="lobby-squad-card"><span>${text("lobby.currentTeam")}</span><b>${onlineCount}<small>/4</small></b><em>${text("lobby.onlinePlayers")}</em><div class="squad-preview">${squadPreview}</div></aside></section><section class="lobby-grid"><div class="players-panel"><div class="panel-title"><span><i></i> ${text("lobby.roster")}</span><b>${text("lobby.onlineCount", { count: onlineCount })}</b></div><div class="slot-list">${lobby.slots.map((slot) => slotMarkup(slot, lobby.hostId)).join("")}</div></div><aside class="invite-panel"><div class="invite-panel-heading"><div><span>${text("lobby.invite")}</span><b>${text("lobby.callTeam")}</b></div><i aria-hidden="true">✦</i></div><label>${text("lobby.link")}</label><div class="copy-row"><input readonly value="${escapeHtml(roomUrl)}" ${attr("aria-label", "lobby.roomLink")} /><button id="copy-link" ${attr("aria-label", "lobby.copyLabel")}>${text("lobby.copy")}</button></div><div class="room-pass" ${attr("aria-label", "common.roomCodeValue", { code: player.roomCode })}><div class="pass-pixels" aria-hidden="true"></div><span><small>${text("common.roomCodeLabel")}</small><strong>${escapeHtml(player.roomCode)}</strong><em>${text("lobby.characters")}</em></span></div><p>${text("lobby.linkHelp")}</p>${botDifficultyPanel}</aside></section><section class="lobby-actions"><div class="lobby-action-copy"><span>${text("lobby.status")}</span><b>${ownSlot?.ready ? text("lobby.youReady") : text("lobby.confirm")}</b></div><button class="ready-button ${ownSlot?.ready ? "active" : ""}" id="ready-button">${ownSlot?.ready ? text("lobby.ready") : text("lobby.imReady")}</button>${isHost ? `<button class="primary start-button" id="start-button"><span><small>${text("common.host")}</small>${text("lobby.start")}</span><b>▶</b></button>` : `<div class="host-wait"><i></i> ${text("common.waitHost")}</div>`}</section></main>`;
+  root.innerHTML = `<main class="lobby-shell ${firstLobbyRender ? "lobby-entering" : ""} ${gameMode === GAME_MODES.SUPER ? "super-lobby" : ""} ${modeChanged ? `mode-switching ${switchDirection}` : ""}"><div class="lobby-backdrop" aria-hidden="true"><i></i><i></i><i></i></div><nav class="lobby-nav">${brand()}${settingsMenu()}<div class="room-chip"><i></i><span>${text("lobby.active")}</span><b>${escapeHtml(player.roomCode)}</b></div></nav><section class="lobby-heading"><div class="lobby-heading-copy"><div class="eyebrow"><span>●</span> ${text("lobby.waitingRoom")}</div><h2>${text("lobby.build")}<br><strong>${text("lobby.squad")}</strong></h2><p>${isHost ? text("lobby.hostDescription") : text("lobby.guestDescription")}</p></div><aside class="lobby-squad-card"><span>${text("lobby.currentTeam")}</span><b>${onlineCount}<small>/${capacity}</small></b><em>${text("lobby.onlinePlayers")}</em><div class="squad-preview">${squadPreview}</div></aside></section><section class="lobby-grid"><div class="players-panel"><div class="panel-title"><span><i></i> ${text("lobby.roster")}</span><b>${text("lobby.onlineCount", { count: onlineCount, capacity })}</b></div><div class="slot-list">${lobby.slots.map((slot) => slotMarkup(slot, lobby.hostId)).join("")}</div></div><aside class="invite-panel"><div class="invite-panel-heading"><div><span>${text("lobby.invite")}</span><b>${text("lobby.callTeam")}</b></div><i aria-hidden="true">✦</i></div><label>${text("lobby.link")}</label><div class="copy-row"><input readonly value="${escapeHtml(roomUrl)}" ${attr("aria-label", "lobby.roomLink")} /><button id="copy-link" ${attr("aria-label", "lobby.copyLabel")}>${text("lobby.copy")}</button></div><div class="room-pass" ${attr("aria-label", "common.roomCodeValue", { code: player.roomCode })}><div class="pass-pixels" aria-hidden="true"></div><span><small>${text("common.roomCodeLabel")}</small><strong>${escapeHtml(player.roomCode)}</strong><em>${text("lobby.characters")}</em></span></div><p>${text("lobby.linkHelp", { capacity })}</p>${botDifficultyPanel}${botControlPanel}</aside></section><section class="lobby-actions"><div class="lobby-action-copy"><span>${text("lobby.status")}</span><b>${ownSlot?.ready ? text("lobby.youReady") : text("lobby.confirm")}</b></div><button class="ready-button ${ownSlot?.ready ? "active" : ""}" id="ready-button">${ownSlot?.ready ? text("lobby.ready") : text("lobby.imReady")}</button>${isHost ? `<button class="primary start-button" id="start-button"><span><small>${text("common.host")}</small>${text("lobby.start")}</span><b>▶</b></button>` : `<div class="host-wait"><i></i> ${text("common.waitHost")}</div>`}</section></main>`;
   root.querySelector(".lobby-grid")?.insertAdjacentHTML("beforebegin", modePanel);
+  if (!canUseClassic) {
+    root.querySelector(".mode-panel")?.insertAdjacentHTML("beforeend", `<p class="mode-capacity-hint">${text("mode.classicFull")}</p>`);
+  }
+  root.querySelector("#add-bot-button")?.addEventListener("click", () => send({ type: "addBot" }));
+  root.querySelector("#remove-bot-button")?.addEventListener("click", () => send({ type: "removeBot" }));
   root.querySelector("#copy-link").addEventListener("click", async () => { await navigator.clipboard.writeText(roomUrl); root.querySelector("#copy-link").innerHTML = text("lobby.copied"); });
   root.querySelector("#ready-button").addEventListener("click", () => send({ type: "ready", ready: !ownSlot?.ready }));
   for (const button of root.querySelectorAll("[data-bot-difficulty]")) {
@@ -396,12 +975,24 @@ function renderLobby(lobby) {
   });
 }
 
+/**
+ * Gera o HTML de cada vaga da sala.
+ */
 function slotMarkup(slot, hostId) {
   const color = PLAYER_COLORS[slot.slot];
   if (slot.kind === "empty") return `<div class="player-slot empty" style="--slot-color:${color}"><span class="slot-number">0${slot.slot + 1}</span><i aria-hidden="true">+</i><div><b>${text("slot.open")}</b><small>${text("slot.waiting")}</small></div><em>${text("slot.available")}</em></div>`;
   return `<div class="player-slot occupied" style="--slot-color:${color}"><span class="slot-number">0${slot.slot + 1}</span><img src="/player-avatar-${slot.slot + 1}.png" alt="" /><div><b>${escapeHtml(slot.name)} ${slot.id === hostId ? `<mark>${text("common.host")}</mark>` : ""}</b><small>${slot.kind === "bot" ? text("slot.bot") : text("slot.connected")}</small></div><span class="slot-trophies" ${attr("title", "common.trophyCount", { count: Number(slot.trophies) || 0 })}><img src="/trophy-pixel.png" alt="" /><b>${Number(slot.trophies) || 0}</b></span><em class="${slot.ready ? "is-ready" : ""}">${slot.ready ? text("slot.ready") : text("slot.notReady")}</em></div>`;
 }
 
+
+// ============================================================
+// PARTIDA
+// ============================================================
+
+/**
+ * Renderiza a tela da partida e inicia
+ * canvas, countdown, áudio e controles.
+ */
 function renderMatch(start) {
   setMenuMusicActive(false);
   stopVictory();
@@ -417,7 +1008,7 @@ function renderMatch(start) {
   const countdownMs = Math.max(1200, Number(start.countdownMs) || 4420);
   const initialMatchTime = formatMatchTime(start.durationMs || 90_000);
   const roster = start.players.map((candidate) => `<span style="--intro-color:${PLAYER_COLORS[candidate.slot]}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="${escapeHtml(candidate.name)}" /><b>P${candidate.slot + 1}</b></span>`).join("");
-  root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.initialAlive")}</b></div><div id="hud-players"></div><div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
+  root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.aliveMany", { count: start.players.filter((candidate) => candidate.alive).length })}</b></div><div id="hud-players"></div><div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
   const isSuperMode = start.mode === GAME_MODES.SUPER;
   root.querySelector(".game-shell")?.classList.toggle("super-mode", isSuperMode);
   setText(root.querySelector(".match-label b"), isSuperMode ? "match.super" : "match.classic");
@@ -461,6 +1052,22 @@ function renderMatch(start) {
   );
 }
 
+
+// ============================================================
+// HUD DA PARTIDA
+// ============================================================
+
+/**
+ * Atualiza informações exibidas ao lado da arena:
+ *
+ * - tempo;
+ * - jogadores vivos;
+ * - bombas;
+ * - fogo;
+ * - velocidade;
+ * - habilidades;
+ * - Sudden Death.
+ */
 function updateHud(state) {
   const timer = root.querySelector("#match-timer");
   if (timer) {
@@ -488,6 +1095,14 @@ function updateHud(state) {
   }).join("");
 }
 
+
+// ============================================================
+// RESULTADO DA PARTIDA
+// ============================================================
+
+/**
+ * Renderiza vitória, empate e classificação da rodada.
+ */
 function renderResult(winnerSlot, standings = [], reason = "elimination") {
   stopMatchAudio();
   setMenuMusicActive(false);
@@ -522,7 +1137,7 @@ function renderResult(winnerSlot, standings = [], reason = "elimination") {
     stopVictoryLoop = startVictoryAnimation(root.querySelector("#winner-celebration canvas"), winner.slot);
   } else {
     playDrawSound();
-    const drawPlayers = (reason === "timeout" ? ranking.filter((candidate) => candidate.alive) : ranking).slice(0, 4);
+    const drawPlayers = (reason === "timeout" ? ranking.filter((candidate) => candidate.alive) : ranking).slice(0, ROOM_CAPACITY);
     const drawRoster = drawPlayers.map((candidate, index) => `<article style="--draw-color:${PLAYER_COLORS[candidate.slot]};--draw-delay:${index * .12}s"><i></i><img src="/player-avatar-${candidate.slot + 1}.png" alt="${escapeHtml(candidate.name)}" /><b>${escapeHtml(candidate.name)}</b></article>`).join("");
     const drawKicker = reason === "timeout" ? text("result.timeout") : text("result.doubleBlast");
     const drawClock = reason === "timeout" ? "00:00" : "K.O.";
@@ -585,6 +1200,14 @@ function renderResult(winnerSlot, standings = [], reason = "elimination") {
   resultTimers.push(setTimeout(mountResultBoard, winner ? RESULT_BOARD_REVEAL_MS : DRAW_BOARD_REVEAL_MS));
 }
 
+
+// ============================================================
+// ERROS E AVISOS
+// ============================================================
+
+/**
+ * Renderiza erros retornados pelo servidor.
+ */
 function renderError(message) {
   const knownErrors = { ROOM_FULL: "error.fullTitle", ROOM_NOT_FOUND: "error.notFoundTitle", MATCH_IN_PROGRESS: "error.inProgressTitle" };
   const knownError = Object.hasOwn(knownErrors, message.code);
@@ -600,8 +1223,45 @@ function renderError(message) {
   root.querySelector("#new-room").addEventListener("click", () => { history.pushState({}, "", "/"); renderLanding(); });
 }
 
+/**
+ * Mostra uma mensagem temporária na tela.
+ */
 function showToast(key, danger = false) { document.body.insertAdjacentHTML("beforeend", `<div class="toast ${danger ? "danger" : ""}" role="status">${text(key)}</div>`); }
 
-window.addEventListener("popstate", () => { socket?.close(); const code = roomFromPath(); code ? renderDirectJoin(code) : renderLanding(); });
-const initialRoom = roomFromPath();
-if (initialRoom) renderDirectJoin(initialRoom); else renderLanding();
+
+// ============================================================
+// INICIALIZAÇÃO
+// ============================================================
+
+// Inicializa o sistema de áudio.
+initializeAudio();
+
+/**
+ * Detecta navegação pelo histórico do navegador.
+ */
+window.addEventListener(
+  "popstate",
+  () => {
+    socket?.close();
+
+    const code =
+      roomFromPath();
+
+    if (code) {
+      renderDirectJoin(code);
+    } else {
+      renderLanding();
+    }
+  },
+);
+
+// Verifica se o usuário abriu diretamente
+// um link para uma sala.
+const initialRoom =
+  roomFromPath();
+
+if (initialRoom) {
+  renderDirectJoin(initialRoom);
+} else {
+  renderLanding();
+}

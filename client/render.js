@@ -1,4 +1,5 @@
-import { BOARD_HEIGHT, BOARD_WIDTH, CRATE, PLAYER_COLORS, TILE_SIZE, WALL } from "../shared/constants.js";
+import { arenaDimensions, isArenaBoundary } from "../shared/arena.js";
+import { CRATE, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
 
 const px = (context, color, x, y, width, height) => {
   context.fillStyle = color;
@@ -198,6 +199,8 @@ const CHARACTER_PALETTES = [
   { helmet: "#171a2a", suit: "#20243a", accent: "#c8ff50", gloves: "#ff8bb4", boots: "#e84d91" },
   { helmet: "#2e68d7", suit: "#3476e8", accent: "#55dff7", gloves: "#ff8bb4", boots: "#e94c91" },
   { helmet: "#ed5037", suit: "#f15c3d", accent: "#ffd24d", gloves: "#ff9bad", boots: "#d93657" },
+  { helmet: "#f0c83f", suit: "#d9a629", accent: "#fff173", gloves: "#ff9bad", boots: "#9a6a12" },
+  { helmet: "#ec873d", suit: "#d66d27", accent: "#ffd0a2", gloves: "#ff9bad", boots: "#974319" },
 ];
 
 function shade(color, amount) {
@@ -582,21 +585,25 @@ export function startVictoryAnimation(canvas, slot = 0) {
 export function renderGame(canvas, state) {
   if (!state) return;
   const context = canvas.getContext("2d");
-  const width = BOARD_WIDTH * TILE_SIZE;
-  const height = BOARD_HEIGHT * TILE_SIZE;
-  const grid = state.grid || ".".repeat(BOARD_WIDTH * BOARD_HEIGHT);
+  const { width: columns, height: rows } = arenaDimensions(state.arenaType);
+  const width = columns * TILE_SIZE;
+  const height = rows * TILE_SIZE;
+  const grid = state.grid || ".".repeat(columns * rows);
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
   const animationTime = performance.now() / 1000;
   context.imageSmoothingEnabled = false;
   context.clearRect(0, 0, width, height);
   px(context, "#07111c", 0, 0, width, height);
-  for (let y = 0; y < BOARD_HEIGHT; y += 1) {
-    for (let x = 0; x < BOARD_WIDTH; x += 1) {
-      const tile = grid[y * BOARD_WIDTH + x];
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      const tile = grid[y * columns + x];
       const left = x * TILE_SIZE;
       const top = y * TILE_SIZE;
+      if (tile === VOID) continue;
       drawFloor(context, left, top, x, y);
       if (tile === WALL) {
-        const border = x === 0 || y === 0 || x === BOARD_WIDTH - 1 || y === BOARD_HEIGHT - 1;
+        const border = isArenaBoundary(state.arenaType, x, y);
         drawWall(context, left, top, border);
       } else if (tile === CRATE) {
         drawCrate(context, left, top);
@@ -606,7 +613,7 @@ export function renderGame(canvas, state) {
   for (const powerup of state.powerups || []) drawPowerup(context, powerup, animationTime);
   for (const blast of state.blasts || []) drawBlast(context, blast, animationTime);
   for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
-  for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot], animationTime);
+  for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
   for (const block of state.fallingBlocks || []) drawFallingBlock(context, block, animationTime);
 }
 

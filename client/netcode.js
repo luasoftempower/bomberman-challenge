@@ -1,4 +1,5 @@
-import { BOARD_WIDTH, CRATE, EMPTY, MOVE_SPEED, TILE_SIZE } from "../shared/constants.js";
+import { tileAt } from "../shared/sim.js";
+import { CRATE, EMPTY, MOVE_SPEED, TILE_SIZE } from "../shared/constants.js";
 
 export function cardinalInput(input) {
   if (input?.dx) return { x: Math.sign(input.dx), y: 0 };
@@ -7,7 +8,7 @@ export function cardinalInput(input) {
 }
 
 function tileBlocked(state, self, tileX, tileY) {
-  const tile = state.grid?.[tileY * BOARD_WIDTH + tileX];
+  const tile = state.grid ? tileAt(state.grid, tileX, tileY) : undefined;
   if (tile !== EMPTY && !(tile === CRATE && self.blockPass)) return true;
   if (!self.bombPass && state.bombs?.some((bomb) => bomb.x === tileX && bomb.y === tileY)) return true;
   return state.players.some((candidate) => {
