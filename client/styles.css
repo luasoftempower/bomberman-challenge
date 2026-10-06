@@ -973,3 +973,29 @@ kbd { display:inline-block; min-width:24px; text-align:center; padding:4px 5px; 
 .bot-control-buttons button:disabled, .mode-card:disabled { cursor:not-allowed; }
 .bot-control-panel > p, .mode-capacity-hint { color:#aaa1b5; font:400 8px/1.6 Silkscreen; }
 .bot-control-buttons button:focus-visible { outline:2px solid var(--lime); outline-offset:3px; }
+/* Aparência do painel de poderes, que fica na barra lateral, fora da arena. */
+.power-legend { margin:12px 0; border:1px solid #635078; border-radius:8px; background:#110e19; color:#eee8f5; }
+.power-legend[hidden] { display:none; }
+.power-legend summary { min-height:44px; padding:12px; cursor:pointer; font:500 11px Silkscreen; }
+.power-legend summary:focus-visible { outline:2px solid var(--lime); outline-offset:2px; }
+#power-count { float:right; color:var(--lime); }
+/* Se houver muitos poderes, a lista ganha rolagem para não ocupar toda a tela. */
+#power-list { max-height:300px; overflow-y:auto; overscroll-behavior:contain; padding:0 12px 12px; }
+#power-list ul { list-style:none; padding:0; margin:0; }
+#power-list li { display:grid; grid-template-columns:28px minmax(0,1fr); gap:8px; padding:10px 0; border-top:1px solid #342a43; }
+.power-icon { font-size:22px; }
+#power-list b { font-size:13px; }
+#power-list p { margin:5px 0; font:400 13px/1.45 sans-serif; color:#c6bdd2; }
+.power-key { display:block; font:400 12px/1.5 sans-serif; color:#d9c8ff; }
+/* Em telas pequenas ou de toque, a lista ocupa menos altura. */
+@media (max-width:980px), (hover:none) {
+  #power-list { max-height:240px; }
+}
+/* No celular deitado, mantém a legenda disponível abaixo da arena. */
+@media (orientation:landscape) and (max-height:560px) and (max-width:1000px) {
+  .game-shell { overflow:visible; }
+  .game-layout { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .match-sidebar { display:block; margin:0; }
+  .match-sidebar > .panel-title, .match-sidebar > #hud-players { display:none; }
+  .power-legend { margin:0; }
+}

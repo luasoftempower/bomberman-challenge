@@ -77,7 +77,7 @@ export function createInputController(send, onInput = () => {}) {
 
   const keydown = (event) => {
     // Mantém o teclado do menu independente dos controles da partida.
-    if (event.target.closest?.("[data-settings-menu], input, textarea, select")) return;
+    if (event.target.closest?.("[data-settings-menu], .power-legend summary, input, textarea, select")) return;
     const action = keyMap[event.code] || keyMap[event.key];
     if (!action) return;
     event.preventDefault();
@@ -86,7 +86,7 @@ export function createInputController(send, onInput = () => {}) {
   const keyup = (event) => {
     const action = keyMap[event.code] || keyMap[event.key];
     if (!action) return;
-    if (!event.target.closest?.("[data-settings-menu], input, textarea, select")) event.preventDefault();
+    if (!event.target.closest?.("[data-settings-menu], .power-legend summary, input, textarea, select")) event.preventDefault();
     release(action, `key:${event.code || event.key}`);
   };
   const visibilityChange = () => { if (document.hidden) releaseAll(); };

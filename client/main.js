@@ -6,6 +6,7 @@ import "./i18n/language.css";
 import "./settings-menu.css";
 // Componentes devolvem o HTML das partes da interface; utilitários concentram
 // operações compartilhadas, como tratar valores no HTML e formatar o tempo.
+import { activePowers, powerLegendMarkup, powerListMarkup } from "./components/power-legend.js";
 import { brand } from "./components/brand.js";
 import { landingMarkup, createRoomButtonContent } from "./components/landing.js";
 import { initializeMenuIntro } from "./components/menu-intro.js";
@@ -1008,7 +1009,7 @@ function renderMatch(start) {
   const countdownMs = Math.max(1200, Number(start.countdownMs) || 4420);
   const initialMatchTime = formatMatchTime(start.durationMs || 90_000);
   const roster = start.players.map((candidate) => `<span style="--intro-color:${PLAYER_COLORS[candidate.slot]}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="${escapeHtml(candidate.name)}" /><b>P${candidate.slot + 1}</b></span>`).join("");
-  root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.aliveMany", { count: start.players.filter((candidate) => candidate.alive).length })}</b></div><div id="hud-players"></div><div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
+  root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.aliveMany", { count: start.players.filter((candidate) => candidate.alive).length })}</b></div><div id="hud-players"></div>${powerLegendMarkup()}<div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/bomberlan-logo-transparent.png" alt="Bomberlan" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
   const isSuperMode = start.mode === GAME_MODES.SUPER;
   root.querySelector(".game-shell")?.classList.toggle("super-mode", isSuperMode);
   setText(root.querySelector(".match-label b"), isSuperMode ? "match.super" : "match.classic");
@@ -1017,6 +1018,11 @@ function renderMatch(start) {
     root.querySelector(".controls-card")?.insertAdjacentHTML("beforeend", `<p><kbd>E</kbd> ${text("controls.detonate")}</p><p><kbd>Q</kbd> ${text("controls.throw")}</p>`);
     root.querySelector(".touch-controls")?.insertAdjacentHTML("beforeend", `<div class="power-buttons"><button data-action="detonate" ${attr("aria-label", "controls.remoteLabel")}>${text("controls.remote")}</button><button data-action="special" ${attr("aria-label", "controls.gloveLabel")}>${text("controls.glove")}</button></div>`);
   }
+  // O modo clássico não tem itens, então a legenda aparece apenas no Super.
+  const legend = root.querySelector("#power-legend");
+  legend.hidden = !isSuperMode;
+  // Em telas pequenas ou de toque, começa fechada para economizar espaço.
+  legend.open = !window.matchMedia("(max-width: 980px), (hover: none), (max-height: 560px)").matches;
   renderGame(root.querySelector("canvas"), latestSnapshot);
   updateHud(latestSnapshot);
   startRenderLoop();
@@ -1082,6 +1088,18 @@ function updateHud(state) {
   if (matchLabel && state.suddenDeathActive) setText(matchLabel, "match.suddenDeath");
   const target = root.querySelector("#hud-players");
   if (!target || !state.players) return;
+  // A legenda mostra os poderes de quem está jogando neste navegador.
+  const self = state.players.find((candidate) => candidate.id === player.playerId);
+  const powerList = root.querySelector("#power-list");
+  // Guarda um resumo dos poderes e de o jogador estar vivo.
+  // Assim, a lista só é refeita quando essas informações mudam.
+  const powerSignature = JSON.stringify([Boolean(self?.alive), activePowers(self, state.grid)]);
+  if (powerList && powerList.dataset.signature !== powerSignature) {
+    // Atualiza só o conteúdo: a legenda continua aberta ou fechada como o jogador escolheu.
+    powerList.innerHTML = powerListMarkup(self, state.grid);
+    powerList.dataset.signature = powerSignature;
+    root.querySelector("#power-count").textContent = activePowers(self, state.grid).length;
+  }
   const signature = state.players.map((candidate) => `${candidate.id}:${candidate.alive}:${candidate.kind}:${candidate.maxBombs}:${candidate.fireRange}:${candidate.moveSpeed}:${candidate.remote}:${candidate.glove}:${candidate.kick}:${candidate.bombPass}:${candidate.blockPass}:${candidate.protected}`).join("|");
   if (signature === lastHudSignature) return;
   lastHudSignature = signature;
