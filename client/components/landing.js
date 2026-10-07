@@ -4,6 +4,7 @@ import { text, attr } from "../i18n/index.js";
 import { settingsMenu } from "../settings-menu.js";
 import { escapeHtml } from "../utils/html.js";
 import { brand } from "./brand.js";
+import { gameplayGuideMarkup } from "./gameplay-guide.js";
 import { menuIntro } from "./menu-intro.js";
 
 // Recebe o nome como dado: escapeHtml() protege o atributo value, sem traduzir o nome.
@@ -96,6 +97,25 @@ function roomForm() {
           </button>
         </div>
       </div>
+      <!--
+        type="button" impede que este controle envie o formulário de entrar na
+        sala. aria-haspopup e aria-controls avisam às tecnologias assistivas que
+        ele abre a janela de instruções identificada logo abaixo da página.
+      -->
+      <button
+        class="how-to-play-action"
+        id="open-gameplay-guide"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="gameplay-guide-dialog"
+        ${attr("aria-label", "guide.openLabel")}
+      >
+        <span>
+          <small>${text("guide.quickGuide")}</small>
+          ${text("guide.title")}
+        </span>
+        <b aria-hidden="true">?</b>
+      </button>
       <p class="form-error menu-error" id="form-error" role="alert"></p>
     </form>
   `;
@@ -161,6 +181,7 @@ export function landingMarkup({ showIntro, playerName }) {
         ${heroArt()}
       </section>
       ${menuFooter()}
+      ${gameplayGuideMarkup()}
     </main>
   `;
 }
