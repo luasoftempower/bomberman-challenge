@@ -20,10 +20,18 @@ import {
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MATCH_COUNTDOWN_MS = 4420;
-const NETWORK_RATE = 30;
+// 20 Hz divide exatamente os 40 Hz da simulação: sai um snapshot a cada dois
+// passos, sem a cadência irregular 25/50 ms produzida pela antiga taxa de 30 Hz.
+// O cliente continua desenhando a 60 FPS por predição/interpolação.
+const NETWORK_RATE = 20;
 const SNAPSHOT_INTERVAL_MS = 1000 / NETWORK_RATE;
-const MAX_SNAPSHOT_BACKLOG_BYTES = 16 * 1024;
-const MAX_CATCH_UP_STEPS = 8;
+// Um snapshot antigo não ajuda um jogo em tempo real. Ao detectar pouco mais
+// de um pacote aguardando envio, pulamos quadros voláteis até a rede alcançar o
+// estado atual. Eventos confiáveis (lobby, início e resultado) nunca são pulados.
+const MAX_SNAPSHOT_BACKLOG_BYTES = 4 * 1024;
+// Quatro passos recuperam travadas de até 100 ms. Mais que isso criava rajadas
+// pesadas de IA/física e um salto perceptível para todos os jogadores.
+const MAX_CATCH_UP_STEPS = 4;
 
 // ============================================================
 // DIREÇÕES
@@ -131,7 +139,7 @@ const send = (
   }
 
   socket.send(
-    JSON.stringify(message),
+    typeof message === "string" ? message : JSON.stringify(message),
   );
 
   return true;
@@ -318,11 +326,15 @@ export class Room {
     const volatile =
       message.type === "snapshot";
 
+    // O conteúdo é igual para todos. Serializar uma única vez evita repetir o
+    // trabalho mais caro do broadcast em salas com vários jogadores humanos.
+    const payload = JSON.stringify(message);
+
     for (const slot of this.slots) {
       if (slot.kind === "human") {
         send(
           slot.socket,
-          message,
+          payload,
           volatile,
         );
       }
@@ -1496,7 +1508,9 @@ export function startRoomLoop(
             room,
           ] of rooms
         ) {
-          room.tick(now);
+          // Salas sem humanos ficam preservadas por um minuto para a limpeza,
+          // mas não precisam gastar CPU do Render simulando bots invisíveis.
+          if (room.humanCount() > 0) room.tick(now);
 
           /*
            * Remove salas vazias depois de 1 minuto.

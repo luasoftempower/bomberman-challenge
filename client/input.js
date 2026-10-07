@@ -33,7 +33,19 @@ export function createInputController(send, onInput = () => {}) {
     const input = value();
     const serialized = JSON.stringify(input);
     const changed = serialized !== last;
-    if (changed) onInput(input);
+    /*
+     * O estado visual recebe também a intenção direcional. Ela é diferente da
+     * tecla atualmente segurada: um toque rápido precisa continuar guardado até
+     * o personagem alcançar o centro da próxima casa, exatamente como ocorre no
+     * servidor. Sem esses dois campos, curvas rápidas pareciam "não pegar".
+     */
+    if (changed) {
+      onInput({
+        ...input,
+        direction: latestDirection,
+        directionSequence,
+      });
+    }
     if (force || changed) {
       last = serialized;
       packetSequence += 1;

@@ -1,6 +1,11 @@
 import { arenaDimensions, isArenaBoundary } from "../shared/arena.js";
 import { CRATE, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
 
+// Os mapas são fracos (WeakMap): quando a tela remove um canvas, o navegador
+// pode liberar automaticamente o contexto e o cache associados a ele.
+const gameContexts = new WeakMap();
+const staticArenaLayers = new WeakMap();
+
 const px = (context, color, x, y, width, height) => {
   context.fillStyle = color;
   context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
@@ -54,6 +59,41 @@ function drawCrate(context, left, top) {
   px(context, "#ffd069", left + 9, top + 9, 3, 3);
   px(context, "#ffd069", left + 28, top + 28, 3, 3);
   px(context, "#361821", left + 17, top + 17, 6, 6);
+}
+
+/**
+ * Desenha piso, paredes e caixas uma única vez em um canvas auxiliar.
+ * A camada só é refeita quando a string da grade muda, como após uma explosão.
+ * Isso elimina centenas de fillRect repetidos em cada frame da partida.
+ */
+function staticArenaLayer(canvas, grid, arenaType, columns, rows, width, height) {
+  const key = `${arenaType}:${grid}`;
+  const cached = staticArenaLayers.get(canvas);
+  if (cached?.key === key && cached.width === width && cached.height === height) {
+    return cached.canvas;
+  }
+
+  const layer = canvas.ownerDocument.createElement("canvas");
+  layer.width = width;
+  layer.height = height;
+  const context = layer.getContext("2d", { alpha: false });
+  context.imageSmoothingEnabled = false;
+  px(context, "#07111c", 0, 0, width, height);
+
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      const tile = grid[y * columns + x];
+      if (tile === VOID) continue;
+      const left = x * TILE_SIZE;
+      const top = y * TILE_SIZE;
+      drawFloor(context, left, top, x, y);
+      if (tile === WALL) drawWall(context, left, top, isArenaBoundary(arenaType, x, y));
+      else if (tile === CRATE) drawCrate(context, left, top);
+    }
+  }
+
+  staticArenaLayers.set(canvas, { key, width, height, canvas: layer });
+  return layer;
 }
 
 const POWERUP_COLORS = {
@@ -120,6 +160,16 @@ function drawPowerup(context, powerup, animationTime) {
     px(context, "#ecffff", left + 17, top + 18, 6, 10);
     px(context, "#166a9e", left + 19, top + 20, 3, 5);
   }
+}
+
+// Desenha a miniatura exatamente com os mesmos pixels usados na arena.
+// O guia do menu chama esta função para que os ícones nunca fiquem diferentes
+// do item que o jogador encontra durante a partida.
+export function drawPowerupIcon(canvas, type) {
+  const context = canvas?.getContext?.("2d");
+  if (!context) return;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  drawPowerup(context, { id: 0, type, x: 0, y: 0 }, 0);
 }
 
 function drawBlast(context, blast, animationTime) {
@@ -584,7 +634,13 @@ export function startVictoryAnimation(canvas, slot = 0) {
 
 export function renderGame(canvas, state) {
   if (!state) return;
-  const context = canvas.getContext("2d");
+  let context = gameContexts.get(canvas);
+  if (!context) {
+    // desynchronized reduz a fila entre o desenho e a composição quando o
+    // navegador oferece esse recurso; navegadores sem suporte apenas o ignoram.
+    context = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    gameContexts.set(canvas, context);
+  }
   const { width: columns, height: rows } = arenaDimensions(state.arenaType);
   const width = columns * TILE_SIZE;
   const height = rows * TILE_SIZE;
@@ -594,22 +650,11 @@ export function renderGame(canvas, state) {
   const animationTime = performance.now() / 1000;
   context.imageSmoothingEnabled = false;
   context.clearRect(0, 0, width, height);
-  px(context, "#07111c", 0, 0, width, height);
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < columns; x += 1) {
-      const tile = grid[y * columns + x];
-      const left = x * TILE_SIZE;
-      const top = y * TILE_SIZE;
-      if (tile === VOID) continue;
-      drawFloor(context, left, top, x, y);
-      if (tile === WALL) {
-        const border = isArenaBoundary(state.arenaType, x, y);
-        drawWall(context, left, top, border);
-      } else if (tile === CRATE) {
-        drawCrate(context, left, top);
-      }
-    }
-  }
+  context.drawImage(
+    staticArenaLayer(canvas, grid, state.arenaType, columns, rows, width, height),
+    0,
+    0,
+  );
   for (const powerup of state.powerups || []) drawPowerup(context, powerup, animationTime);
   for (const blast of state.blasts || []) drawBlast(context, blast, animationTime);
   for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
