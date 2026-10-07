@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ST-17 · Prévia da legenda</title>
+<div id="app"></div>
+<script type="module">
+import '../client/styles.css';
+import { brand } from '../client/components/brand.js';
+import { powerLegendMarkup, powerListMarkup, activePowers } from '../client/components/power-legend.js';
+import { createMatch, snapshot } from '../shared/sim.js';
+import { renderGame } from '../client/render.js';
+import { GAME_MODES } from '../shared/constants.js';
+import { setLanguage, getLanguage } from '../client/i18n/index.js';
+const state = createMatch(123, Array.from({length:4}, (_,slot)=>({id:String(slot),slot,name:'P'+(slot+1)})), {mode:GAME_MODES.SUPER});
+const self=state.players[0];
+Object.assign(self,{maxBombs:4,fireRange:13,moveSpeed:148,remote:true,glove:true,kick:true,bombPass:true,blockPass:true,invincibleUntilTick:320});
+const app=document.querySelector('#app');
+app.innerHTML=`<main class="game-shell super-mode"><header class="game-header">${brand()}<span>ST-17 · PRÉVIA</span><button id="language">PT / EN</button></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440"></canvas></div><aside class="match-sidebar">${powerLegendMarkup()}<button id="expire">Expirar colete</button> <button id="eliminate">Eliminar jogador</button></aside></section></main>`;
+const legend=document.querySelector('#power-legend');
+legend.open=!matchMedia('(max-width:980px), (hover:none), (max-height:560px)').matches;
+function update(){const player=snapshot(state).players[0];document.querySelector('#power-list').innerHTML=powerListMarkup(player,state.grid);document.querySelector('#power-count').textContent=activePowers(player,state.grid).length;renderGame(document.querySelector('canvas'),snapshot(state));}
+let language=getLanguage();document.querySelector('#language').onclick=()=>{language=language==='pt'?'en':'pt';setLanguage(language);};
+document.querySelector('#expire').onclick=()=>{self.invincibleUntilTick=0;update();};
+document.querySelector('#eliminate').onclick=()=>{self.alive=false;update();};
+update();
+function draw(){renderGame(document.querySelector("canvas"),snapshot(state));requestAnimationFrame(draw);}
+requestAnimationFrame(draw);
+</script>
+</html>
