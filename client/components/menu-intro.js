@@ -10,7 +10,7 @@ export function menuIntro() {
       <div class="settings-corner">${settingsMenu()}</div>
       <div class="intro-logo-wrap">
         <i aria-hidden="true"></i>
-        <img src="/bomberlan-logo-transparent.png" alt="Bomberlan" />
+        <img src="/raivolt-logo.png" alt="Raivolt" />
       </div>
       <div class="intro-loader">
         <div class="intro-track"><i></i></div>
@@ -28,7 +28,7 @@ export function menuIntro() {
       </button>
       <section class="intro-story" aria-live="polite">
         <span class="intro-story-kicker">${text("intro.presents")}</span>
-        <h1>${text("intro.welcome")} <strong>BOMBERLAN</strong></h1>
+        <h1>${text("intro.welcome")} <strong>RAIVOLT</strong></h1>
         <p>${text("intro.story")}</p>
         <div class="intro-studio">
           <i aria-hidden="true">★</i>

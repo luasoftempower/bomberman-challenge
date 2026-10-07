@@ -1,21 +1,21 @@
 <p align="center">
-  <img src="public/bomberlan-logo-transparent.png" alt="Logo do Bomberlan" width="450">
+  <img src="public/raivolt-logo.png" alt="Logo do Raivolt" width="450">
 </p>
 
 <p align="center">
-  <strong>Um jogo multiplayer inspirado nos clássicos de arena com bombas, visual pixelado e partidas rápidas para até quatro jogadores.</strong>
+  <strong>Um jogo multiplayer inspirado nos clássicos de arena com cargas, visual pixelado e partidas rápidas para até quatro jogadores.</strong>
 </p>
 
 ---
 
 ## 🎮 Sobre o Projeto
 
-O **Bomberlan** é um protótipo de jogo online em tempo real. Crie uma sala, compartilhe o código com seus amigos e dispute para ser o último sobrevivente. 
+O **Raivolt** é um protótipo de jogo online em tempo real. Crie uma sala, compartilhe o código com seus amigos e dispute para ser o último sobrevivente.
 
-As vagas livres são preenchidas automaticamente por **bots inteligentes** capazes de navegar pelo mapa, destruir caixas, fugir de explosões e enfrentar outros jogadores. 
+As vagas livres são preenchidas automaticamente por **bots inteligentes** capazes de navegar pelo mapa, destruir caixas, fugir de descargas e enfrentar outros jogadores.
 
 ### ⚙️ Arquitetura de Rede
-* **Servidor Autoritativo:** O servidor controla a partida por completo e valida movimentos, colisões, bombas e explosões para evitar trapaças.
+* **Servidor Autoritativo:** O servidor controla a partida por completo e valida movimentos, colisões, cargas e descargas para evitar trapaças.
 * **Previsão no Cliente (Client-side Prediction):** O cliente usa previsão visual limitada para manter o personagem responsivo e sem atrasos, sem perder a sincronização online.
 
 ---
@@ -23,14 +23,14 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 ## ✨ Principais Recursos
 
 - 🌐 **Salas Online:** Criação de partidas privadas com código compartilhável.
-- 🤖 **Bots Avançados:** IA com planejamento de rotas, previsão de explosões e fuga segura.
+- 🤖 **Bots Avançados:** IA com planejamento de rotas, previsão de descargas e fuga segura.
 - 🎲 **Mapas Randômicos:** Arena e distribuição de caixas geradas aleatoriamente a cada rodada.
-- 🧱 **Mecânicas Clássicas:** Movimento pixel-perfeito de casa em casa (estilo 16 bits) e reação em cadeia de bombas.
+- 🧱 **Mecânicas Clássicas:** Movimento pixel-perfeito de casa em casa (estilo 16 bits) e reação em cadeia de cargas.
 - 🎨 **Pixel Art:** Personagens, arenas, menus, contagem regressiva e telas de vitória totalmente animados.
 - 📱 **Controles Híbridos:** Suporte completo para teclado e dispositivos com tela sensível ao toque.
 - 🔌 **Tempo Real:** Comunicação via WebSocket usando arquitetura autoritativa.
-- ⏱️ **Dois Modos:** Bomberlan clássico (1:30, sem itens) e Super Bomberlan (3:00, power-ups e Sudden Death).
-- 💥 **Dez Power-ups:** Fogo, Bomba, Patins, Controle Remoto, Luva, Chute, Passagem de Bomba, Passagem de Bloco, Colete e Fogo Cheio.
+- ⏱️ **Dois Modos:** Raivolt clássico (1:30, sem itens) e Raivolt Overdrive (3:00, power-ups e Sudden Death).
+- 💥 **Dez Power-ups:** Alcance elétrico, Carga, Patins, Controle Remoto, Luva, Chute, Passagem de Carga, Passagem de Bloco, Colete e Alta Tensão.
 
 ---
 
@@ -39,11 +39,11 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 | Ação | Teclado | Telas Touch |
 | :--- | :--- | :--- |
 | **Movimentar** | `WASD` ou Setas Direcionais | Direcional na Tela |
-| **Colocar Bomba** | `Espaço` | Botão Virtual |
-| **Detonar Bomba Remota** | `E` | Botão Remoto |
+| **Colocar Carga** | `Espaço` | Botão Virtual |
+| **Detonar Carga Remota** | `E` | Botão Remoto |
 | **Arremessar com a Luva** | `Q` | Botão Luva |
 
-> **Objetivo:** Sobreviver às explosões, eliminar seus oponentes e ser o último jogador vivo na arena!
+> **Objetivo:** Sobreviver às descargas, eliminar seus oponentes e ser o último jogador vivo na arena!
 
 ---
 
@@ -89,10 +89,10 @@ Se preferir rodar o projeto em um ambiente isolado via Docker, utilize os comand
 
 ```bash
 # Construir a imagem do container
-docker build -t bomberlan .
+docker build -t raivolt .
 
 # Executar o container
-docker run --rm -p 3000:3000 -e PUBLIC_ORIGIN=http://localhost:3000 bomberlan
+docker run --rm -p 3000:3000 -e PUBLIC_ORIGIN=http://localhost:3000 raivolt
 ```
 
 ---
@@ -124,7 +124,7 @@ pnpm start
 ├── public/          # Assets estáticos (logos, avatares e sprites)
 ├── server/          # Servidor HTTP, WebSocket e gerenciamento de salas
 ├── shared/          # Regras de negócio, constantes e a IA dos bots
-└── test/            # Suíte de testes (salas, física, bombas e IA)
+└── test/            # Suíte de testes (salas, física, cargas e IA)
 ```
 
 ---
@@ -184,3 +184,7 @@ Este projeto é um **protótipo jogável em desenvolvimento ativo**. Sugestões,
 ## 📄 Licença
 
 Consulte o arquivo [LICENSE](LICENSE) para conhecer os termos de uso e direitos autorais do projeto.
+
+## Identidade visual e release
+
+Consulte o [guia de identidade e checklist de marca](docs/ST-19-identidade.md) antes de cada release pública.

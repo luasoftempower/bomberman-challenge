@@ -12,7 +12,7 @@ import { menuIntro } from "./menu-intro.js";
 function playerProfile(playerName) {
   return `
     <label class="player-profile" for="player-name">
-      <span class="profile-avatar">B</span>
+      <span class="profile-avatar">ϟ</span>
       <span class="profile-copy">
         <small>${text("menu.nameLabel")}</small>
         <input

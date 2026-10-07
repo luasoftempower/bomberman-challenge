@@ -973,3 +973,24 @@ kbd { display:inline-block; min-width:24px; text-align:center; padding:4px 5px; 
 .bot-control-buttons button:disabled, .mode-card:disabled { cursor:not-allowed; }
 .bot-control-panel > p, .mode-capacity-hint { color:#aaa1b5; font:400 8px/1.6 Silkscreen; }
 .bot-control-buttons button:focus-visible { outline:2px solid var(--lime); outline-offset:3px; }
+/* RAIVOLT — electric arena identity */
+:root { --lime:#6ef6ff; --purple:#7460ee; --violet:#b69aff; }
+body { background:#090e20; }
+.menu-home { background:radial-gradient(ellipse at 78% 48%,#292367 0,transparent 48%),radial-gradient(ellipse at 12% 15%,#102d43 0,transparent 45%),#090e20; }
+.menu-header .brand { width:clamp(210px,24vw,360px); }
+.brand img { filter:drop-shadow(0 0 14px #4968cb55); }
+.battle-logo { width:min(550px,100%); }
+.battle-logo > strong { font-size:clamp(35px,4.9vw,65px); color:#d7fbff; text-shadow:0 4px 0 #3088c4,0 9px 0 #403a8c,5px 13px 0 #090b20; animation:none; }
+.battle-logo > em { color:#071a32; background:linear-gradient(120deg,#b5fdff,#5fdff7 55%,#a19bff); }
+.battle-logo > span { background:linear-gradient(#6562b8,#292255); }
+.menu-kicker { color:#93ecff; }
+.hero-burst { background:radial-gradient(ellipse,#6af4ff33 0,#8375ff33 32%,transparent 68%); filter:drop-shadow(0 0 22px #5061ff); }
+.menu-hero-art::before { content:""; position:absolute; width:82%; aspect-ratio:1; left:9%; top:7%; border:2px solid #74e7ff66; border-radius:50%; box-shadow:0 0 35px #5e6eff44,inset 0 0 40px #62bfff22; transform:rotateX(25deg); pointer-events:none; }
+.menu-hero-art::after { content:"ϟ"; position:absolute; top:6%; right:5%; color:#a9faff; font:bold 110px/1 system-ui; text-shadow:0 0 14px #53dfff,0 0 45px #8c59ff; transform:rotate(15deg); pointer-events:none; }
+#menu-mascot-canvas { filter:drop-shadow(0 0 12px #6be8ff66); }
+.profile-avatar { color:#e4fcff; background:linear-gradient(#467ea7,#292b64); border-color:#14233c; box-shadow:inset 0 0 0 2px #72edff; }
+.arena-rank { border-color:#75eaff; }
+.arena-wrap { box-shadow:0 0 35px #4c8cff22,0 18px 60px #0008; }
+.mode-card strong { overflow-wrap:anywhere; }
+@media(max-width:600px) { .battle-logo > strong { font-size:10vw; } .menu-header .brand { width:190px; } }
+@media(prefers-reduced-motion:reduce) { .battle-logo { animation:none; } }
