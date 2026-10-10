@@ -1,10 +1,10 @@
 /* RAIVOLT: restrained 16-bit arcade presentation, shared across entry and lobby. */
 :root { --ink:#f5e8c8; --muted:#9aa5bb; --panel:#20243c; --line:#59617c; --lime:#f2c45e; --violet:#aaa0d6; --purple:#665797; }
-body { background:#10152b; color:var(--ink); }
-body::before { display:none; }
-.menu-home { background:#10152b; }
-.menu-home::before { background:repeating-linear-gradient(0deg,transparent 0 47px,#192039 47px 48px); background-size:auto; mask-image:none; opacity:.7; }
-.menu-home::after { width:100%; height:104px; inset:auto 0 0; border:0; border-radius:0; box-shadow:none; background:repeating-linear-gradient(90deg,#202c45 0 38px,#121b32 38px 40px); border-top:4px solid #52627a; }
+body { background: #0d0a15; color:var(--ink); }
+body::before { display:block; }
+.menu-home { background:radial-gradient(circle at 72% 44%,rgba(77,197,228,.2),transparent 31%), radial-gradient(circle at 20% 72%,rgba(139,92,246,.16),transparent 34%), linear-gradient(135deg,#17243a 0%,#101726 52%,#0a0e19 100%); }
+.menu-home::before { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(120deg,transparent 0 47%,rgba(255,255,255,.025) 47% 48%,transparent 48% 100%), linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px); background-size:auto,48px 48px,48px 48px; mask-image:linear-gradient(to bottom,#000,transparent 90%); }
+.menu-home::after { content:""; position:absolute; z-index:-1; width:520px; height:520px; right:-120px; top:12%; border:80px solid rgba(255,255,255,.018); border-radius:50%; box-shadow:0 0 0 42px rgba(255,255,255,.012),0 0 0 100px rgba(255,255,255,.009); }
 .brand img,.intro-logo-wrap img,.transition-logo img,.match-intro-logo img { image-rendering:pixelated; filter:none; }
 .brand:hover img { filter:none; }
 .menu-header { padding-bottom:16px; border-bottom:2px solid #41465e; }
@@ -31,7 +31,8 @@ body::before { display:none; }
 .menu-code-row { transform:none; }
 .menu-code-row input { background:#101c2c; border-color:#233a4c; border-radius:0; }
 .menu-code-row button { background:#a4cec7; border-color:#233a4c; color:#182b3b; }
-.hero-burst { display:none; }
+.hero-burst { position:absolute; z-index:0; width:min(39vw,510px); aspect-ratio:1; border-radius:50%; background:repeating-conic-gradient(from -12deg,rgba(166,117,255,.18) 0 9deg,transparent 9deg 20deg); mask-image:radial-gradient(circle,#000 0 55%,transparent 72%); animation:menuBurstSpin 35s linear infinite; } /* Fundo original atrás do personagem. */
+.hero-burst { filter:none; }
 .menu-hero-art::before { width:78%; height:30px; aspect-ratio:auto; left:11%; top:auto; bottom:10%; border:0; border-top:5px solid #a1b8be; border-bottom:7px solid #111a2c; border-radius:0; box-shadow:0 5px 0 #060b19; transform:none; background:repeating-linear-gradient(90deg,#4b6573 0 38px,#283e51 38px 40px); }
 .menu-hero-art::after { content:""; width:7px; height:7px; top:24%; right:18%; background:#e6bf68; box-shadow:-210px 65px 0 #557b94,-75px -40px 0 #557b94,35px 130px 0 #e6bf68; transform:none; }
 #menu-mascot-canvas { filter:none; }
@@ -41,15 +42,15 @@ body::before { display:none; }
 .player-count small { color:#b9bdcf; }
 .menu-footer { z-index:1; border-top:3px solid #8095aa; background:#182136; color:#b4bfd0; }
 .menu-footer b { color:#f2c45e; }
-.menu-intro { background:#10152b; }
-.menu-intro::before,.menu-intro::after,.intro-logo-wrap > i,.intro-studio::before,.intro-studio::after { display:none; }
+.menu-intro { background:radial-gradient(circle at 50% 45%,#30264f 0,#171126 38%,#090811 72%); }
+.intro-logo-wrap > i,.intro-studio::before,.intro-studio::after { display:none; }
 .intro-logo-wrap { filter:none; }
 .intro-start { background:#e6ae4d; border-radius:0; box-shadow:inset 0 4px 0 #ffe39c,inset 0 -5px 0 #aa6739,5px 5px 0 #080c1c; }
 .menu-intro.ready .intro-start { animation:none; }
 .intro-track i { background:repeating-linear-gradient(90deg,#8fc9c6 0 14px,#345769 14px 17px); }
 .intro-story-kicker,.intro-studio { border:2px solid #71839b; border-radius:0; background:#20243c; box-shadow:4px 4px 0 #080c1c; }
 .intro-story h1,.intro-studio strong,.intro-studio i { text-shadow:3px 3px 0 #080c1c; }
-.lobby-shell { background:#10152b; }
+.lobby-shell { background:radial-gradient(circle at 80% 8%,rgba(166,117,255,.14),transparent 34%),linear-gradient(135deg,rgba(15,12,24,.35),rgba(9,8,15,.04)); }
 .players-panel,.invite-panel,.mode-panel,.lobby-squad-card,.mode-card { border-radius:0; background:#20243c; border-color:#66718b; box-shadow:4px 4px 0 #080c1c; }
 .arena-wrap { border-color:#71839b; box-shadow:5px 5px 0 #080c1c; }
 .settings-desktop .language-toggle,.settings-menu-toggle { border-radius:0; background:#20243c; box-shadow:3px 3px 0 #080c1c; }
