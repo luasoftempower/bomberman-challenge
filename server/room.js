@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { decideBotInput } from "../shared/bots.js";
+import { STANDARD_MAPS, validateCustomMap } from '../shared/maps.js';
 import {
   GAME_MODES,
   getRoomCapacity,
@@ -188,6 +189,8 @@ export class Room {
     this.botDifficulty = "normal";
 
     this.gameMode = GAME_MODES.CLASSIC;
+    this.mapId = 'original';
+    this.customMap = null;
 
     this.suddenDeathQueue = [];
     this.nextDeathBlockAt = 0;
@@ -351,6 +354,8 @@ export class Room {
 
       hostId: this.hostId,
       capacity: getRoomCapacity(this.gameMode),
+      mapId: this.gameMode === GAME_MODES.SUPER ? this.mapId : 'original',
+      customMap: this.gameMode === GAME_MODES.SUPER ? this.customMap : null,
 
       botDifficulty:
         this.botDifficulty,
@@ -562,6 +567,23 @@ removeBot(playerId) {
     this.broadcastLobby();
   }
 
+
+  setMap(playerId, selection) {
+    if (playerId !== this.hostId || this.phase !== 'lobby' || this.gameMode !== GAME_MODES.SUPER) return false;
+    if (!selection || typeof selection !== 'object') return false;
+    if (selection.mapId === 'custom') {
+      const result = validateCustomMap(selection.customMap);
+      if (result.error) {
+        const host = this.slots.find((slot) => slot.id === playerId);
+        send(host?.socket, { type: 'mapError', key: result.error });
+        return false;
+      }
+      this.customMap = result.map;
+    } else if (selection.mapId !== 'random' && !STANDARD_MAPS.some((map) => map.id === selection.mapId)) return false;
+    this.mapId = selection.mapId;
+    this.broadcastLobby();
+    return true;
+  }
 
   setGameMode(
     playerId,
@@ -845,6 +867,8 @@ removeBot(playerId) {
         {
           mode:
             this.gameMode,
+          mapId: this.mapId,
+          customMap: this.customMap,
         },
       );
 

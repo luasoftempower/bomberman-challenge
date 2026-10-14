@@ -158,6 +158,10 @@ webSockets.on("connection", (socket) => {
       );
     }
 
+    else if (message.type === 'map') {
+      room.setMap(playerId, message);
+    }
+
     // Adiciona bot manualmente.
     else if (message.type === "addBot") {
       room.addBot(playerId);

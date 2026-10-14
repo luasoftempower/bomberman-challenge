@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderGame, startMenuMascotAnimation, startResultCharacterAnimation, startVictoryAnimation } from '../client/render.js';
 import { CHARACTERS } from '../client/identity.js';
+import { createMatch, snapshot } from '../shared/sim.js';
+import { presetMap } from '../shared/maps.js';
 
 function canvasStub() {
   let rectangles = 0;
@@ -17,6 +19,20 @@ function canvasStub() {
   canvas.ownerDocument = { createElement: () => ({ ...canvas, width: 0, height: 0 }) };
   return canvas;
 }
+
+test('custom energy arenas render six players and invalidate the static cache when colors change', () => {
+  const canvas = canvasStub();
+  const slots = Array.from({ length: 6 }, (_, slot) => ({ id: `p${slot}`, slot, name: `P${slot}` }));
+  const state = snapshot(createMatch(123, slots, { mode: 'super', mapId: 'custom', customMap: { ...presetMap('garden'), name: 'Garden' } }));
+  const before = structuredClone(state);
+  renderGame(canvas, state); const initial = canvas.count();
+  renderGame(canvas, state); const cached = canvas.count() - initial;
+  const changed = { ...state, blockColors: '5'.repeat(state.grid.length) };
+  const count = canvas.count(); renderGame(canvas, changed);
+  assert.ok(canvas.count() - count > cached + 100);
+  assert.deepEqual(state, before);
+  assert.equal(canvas.width, 920); assert.equal(canvas.height, 600);
+});
 test('presentation renders movement, protection, defeat and bomb trajectories without mutating snapshots', () => {
  const canvas = canvasStub();
  const state = { grid: '#o.' + '.'.repeat(140), fallingBlocks: [{x:6,y:6,ttl:0.3,duration:0.62}], players: CHARACTERS.map((p,slot)=>({id:`p${slot}`,slot,name:p.name,x:60+slot*40,y:60,alive:slot!==7,protected:slot===0})),
