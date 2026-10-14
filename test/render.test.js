@@ -12,7 +12,10 @@ function canvasStub() {
       if (key === 'fillRect') rectangles++;
     };
   }});
-  return { width: 520, height: 440, getContext: () => context, count: () => rectangles };
+  // renderGame desenha a arena estática em um canvas auxiliar criado via ownerDocument.
+  const canvas = { width: 520, height: 440, getContext: () => context, count: () => rectangles };
+  canvas.ownerDocument = { createElement: () => ({ ...canvas, width: 0, height: 0 }) };
+  return canvas;
 }
 test('presentation renders movement, protection, defeat and bomb trajectories without mutating snapshots', () => {
  const canvas = canvasStub();

@@ -12,7 +12,13 @@ const rooms = new Map();
 const webSockets = new WebSocketServer({
   noServer: true,
   maxPayload: 4096,
-  perMessageDeflate: { threshold: 512, concurrencyLimit: 4 },
+  /*
+   * Snapshots são pequenos, frequentes e descartáveis. Comprimi-los tranca o
+   * event loop com zlib e pode criar picos em instâncias compartilhadas do
+   * Render. Sem compressão, cada quadro sai imediatamente e o cliente prefere
+   * o estado mais novo em vez de economizar poucos bytes.
+   */
+  perMessageDeflate: false,
 });
 
 app.use(express.json({ limit: "8kb" }));

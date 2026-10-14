@@ -557,13 +557,18 @@ test("snapshots run at a smooth rate below the simulation rate", () => {
 
   assert.equal(
     snapshots.length,
-    4,
+    3,
   );
 
   assert.equal(
     snapshots.at(-1)
       .networkRate,
-    30,
+    20,
+  );
+
+  assert.deepEqual(
+    snapshots.map((message) => message.serverTime - startAt),
+    [0, 50, 100],
   );
 });
 

@@ -7,8 +7,10 @@ import "./i18n/language.css";
 import "./settings-menu.css";
 // Componentes devolvem o HTML das partes da interface; utilitários concentram
 // operações compartilhadas, como tratar valores no HTML e formatar o tempo.
+import { activePowers, powerLegendMarkup, powerListMarkup } from "./components/power-legend.js";
 import { brand } from "./components/brand.js";
 import { landingMarkup, createRoomButtonContent } from "./components/landing.js";
+import { compactPowerupLegendMarkup, initializeGameplayGuide, paintPowerupIcons } from "./components/gameplay-guide.js";
 import { initializeMenuIntro } from "./components/menu-intro.js";
 import { settingsMenu, initializeSettingsMenu } from "./settings-menu.js";
 import { t, text, attr, setText, initializeLanguage } from "./i18n/index.js";
@@ -32,6 +34,7 @@ import {
 } from "./audio.js";
 
 import { createInputController } from "./input.js";
+import { activeHudPowerups } from "./gameplay-guide.js";
 import { reconcileLocalPlayer } from "./netcode.js";
 
 import {
@@ -62,7 +65,13 @@ initializeSettingsMenu();
 const root = document.querySelector("#app");
 
 // Limite da predição visual utilizada no multiplayer.
-const MAX_PREDICTION_MS = 220;
+// Tolera picos curtos do Render sem congelar no meio de uma casa. A distância
+// visual continua limitada no reconciliador, portanto ampliar a janela de tempo
+// não permite que o cliente atravesse a arena sem confirmação do servidor.
+const MAX_PREDICTION_MS = 650;
+// Mesmo em rede local há alguns milissegundos entre snapshots. Este piso evita
+// uma microparada visual quando um snapshot novo zera a sua idade.
+const MIN_ACTIVE_PREDICTION_MS = 35;
 
 // Tempo da transição entre lobby e partida.
 const MATCH_TRANSITION_MS = 680;
@@ -77,17 +86,6 @@ const TROPHY_ANIMATION_DURATION_MS =
   WIN_SOUND_MUSIC_CUE_MS -
   RESULT_BOARD_REVEAL_MS -
   TROPHY_ANIMATION_DELAY_MS;
-
-// Informações das habilidades mostradas no HUD.
-const ABILITY_META = {
-  remote: ["R", "ability.remote"],
-  glove: ["G", "ability.glove"],
-  kick: ["K", "ability.kick"],
-  bombPass: ["BP", "ability.bombPass"],
-  blockPass: ["CP", "ability.blockPass"],
-};
-
-
 
 // ============================================================
 // ESTADO GLOBAL DA APLICAÇÃO
@@ -299,9 +297,13 @@ function startRenderLoop() {
         ? now - latestSnapshotReceivedAt
         : 0;
 
+      const halfRtt = estimatedRtt / 2;
+      const networkHorizon = localInput.dx || localInput.dy
+        ? Math.max(MIN_ACTIVE_PREDICTION_MS, halfRtt)
+        : halfRtt;
       const predictionMs = Math.min(
         MAX_PREDICTION_MS,
-        Math.max(0, snapshotAge) + estimatedRtt / 2,
+        Math.max(0, snapshotAge) + networkHorizon,
       );
 
       const displayById = new Map(
@@ -409,6 +411,8 @@ function renderLanding() {
   // Entrega ao componente apenas os dados usados para montar a página inicial.
   // O nome salvo é preservado; somente o nome padrão vem do dicionário de idioma.
   root.innerHTML = landingMarkup({ showIntro, playerName: getName() });
+  paintPowerupIcons(root);
+  initializeGameplayGuide(root);
 
   // O canvas e o botão de início já existem no DOM após a montagem acima.
 
@@ -664,14 +668,16 @@ function handleMessage(message) {
       }
 
       /*
-       * O menor RTT recente representa melhor
-       * a latência real de transporte.
-       *
-       * Picos causados por filas não devem aumentar
-       * demais a predição visual.
+       * Usa o primeiro quartil em vez do menor valor isolado: continua
+       * ignorando picos de fila, mas não subestima permanentemente conexões
+       * remotas como a do Render. A média exponencial impede mudanças bruscas
+       * na distância prevista do jogador.
        */
-      estimatedRtt =
-        Math.min(...rttSamples);
+      const ordered = [...rttSamples].sort((left, right) => left - right);
+      const baseline = ordered[Math.floor((ordered.length - 1) * 0.25)];
+      estimatedRtt = estimatedRtt
+        ? estimatedRtt * 0.8 + baseline * 0.2
+        : baseline;
     }
   }
 
@@ -1010,15 +1016,22 @@ function renderMatch(start) {
   const countdownMs = Math.max(1200, Number(start.countdownMs) || 4420);
   const initialMatchTime = formatMatchTime(start.durationMs || 90_000);
   const roster = start.players.map((candidate) => `<span style="--intro-color:${PLAYER_COLORS[candidate.slot]}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="${escapeHtml(candidate.name)}" /><b>P${candidate.slot + 1}</b></span>`).join("");
-  root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.aliveMany", { count: start.players.filter((candidate) => candidate.alive).length })}</b></div><div id="hud-players"></div><div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/raivolt-logo.png" alt="Raivolt" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
+  root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.aliveMany", { count: start.players.filter((candidate) => candidate.alive).length })}</b></div><div id="hud-players"></div>${powerLegendMarkup()}<div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/raivolt-logo.png" alt="Raivolt" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
   const isSuperMode = start.mode === GAME_MODES.SUPER;
   root.querySelector(".game-shell")?.classList.toggle("super-mode", isSuperMode);
   setText(root.querySelector(".match-label b"), isSuperMode ? "match.super" : "match.classic");
   setText(root.querySelector(".match-intro-kicker"), "match.intro", { code: player.roomCode, mode: isSuperMode ? "RAIVOLT OVERDRIVE" : "RAIVOLT" });
   if (isSuperMode) {
     root.querySelector(".controls-card")?.insertAdjacentHTML("beforeend", `<p><kbd>E</kbd> ${text("controls.detonate")}</p><p><kbd>Q</kbd> ${text("controls.throw")}</p>`);
+    root.querySelector(".match-sidebar")?.insertAdjacentHTML("beforeend", compactPowerupLegendMarkup());
     root.querySelector(".touch-controls")?.insertAdjacentHTML("beforeend", `<div class="power-buttons"><button data-action="detonate" ${attr("aria-label", "controls.remoteLabel")}>${text("controls.remote")}</button><button data-action="special" ${attr("aria-label", "controls.gloveLabel")}>${text("controls.glove")}</button></div>`);
+    paintPowerupIcons(root);
   }
+  // O modo clássico não tem itens, então a legenda aparece apenas no Super.
+  const legend = root.querySelector("#power-legend");
+  legend.hidden = !isSuperMode;
+  // Em telas pequenas ou de toque, começa fechada para economizar espaço.
+  legend.open = !window.matchMedia("(max-width: 980px), (hover: none), (max-height: 560px)").matches;
   renderGame(root.querySelector("canvas"), latestSnapshot);
   updateHud(latestSnapshot);
   startRenderLoop();
@@ -1084,15 +1097,25 @@ function updateHud(state) {
   if (matchLabel && state.suddenDeathActive) setText(matchLabel, "match.suddenDeath");
   const target = root.querySelector("#hud-players");
   if (!target || !state.players) return;
+  // A legenda mostra os poderes de quem está jogando neste navegador.
+  const self = state.players.find((candidate) => candidate.id === player.playerId);
+  const powerList = root.querySelector("#power-list");
+  // Guarda um resumo dos poderes e de o jogador estar vivo.
+  // Assim, a lista só é refeita quando essas informações mudam.
+  const powerSignature = JSON.stringify([Boolean(self?.alive), activePowers(self, state.grid)]);
+  if (powerList && powerList.dataset.signature !== powerSignature) {
+    // Atualiza só o conteúdo: a legenda continua aberta ou fechada como o jogador escolheu.
+    powerList.innerHTML = powerListMarkup(self, state.grid);
+    powerList.dataset.signature = powerSignature;
+    root.querySelector("#power-count").textContent = activePowers(self, state.grid).length;
+  }
   const signature = state.players.map((candidate) => `${candidate.id}:${candidate.alive}:${candidate.kind}:${candidate.maxBombs}:${candidate.fireRange}:${candidate.moveSpeed}:${candidate.remote}:${candidate.glove}:${candidate.kick}:${candidate.bombPass}:${candidate.blockPass}:${candidate.protected}`).join("|");
   if (signature === lastHudSignature) return;
   lastHudSignature = signature;
   const alive = state.players.filter((candidate) => candidate.alive).length;
   setText(root.querySelector("#alive-count"), alive === 1 ? "match.aliveOne" : "match.aliveMany", { count: alive });
   target.innerHTML = state.players.map((candidate) => {
-    const abilities = Object.entries(ABILITY_META).filter(([key]) => candidate[key]).map(([, [icon, label]]) => `<i ${attr("title", label)}>${icon}</i>`);
-    if (candidate.fireRange >= 13) abilities.push(`<i class="full-fire" ${attr("title", "ability.fullFire")}>MAX</i>`);
-    if (candidate.protected) abilities.push(`<i class="suit" ${attr("title", "ability.protected")}>S</i>`);
+    const abilities = activeHudPowerups(candidate).map((powerup) => `<i class="${powerup.hudClass || ""}" ${attr("title", powerup.nameKey)}>${powerup.hudBadge}</i>`);
     return `<div class="hud-player ${candidate.alive ? "" : "dead"}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="" /><span><b>${escapeHtml(candidate.name)}</b><small>${candidate.kind === "bot" ? text("hud.bot") : candidate.id === player.playerId ? text("hud.you") : text("hud.human")} · ${characterFor(candidate.slot).name}</small><span class="hud-stats"><i ${attr("title", "hud.bombs")}>● ${candidate.maxBombs || 2}</i><i ${attr("title", "hud.fire")}>✦ ${candidate.fireRange || 2}</i><i ${attr("title", "hud.speed")}>» ${candidate.moveSpeed || MOVE_SPEED}</i></span><span class="hud-abilities">${abilities.join("")}</span></span><em>${candidate.alive ? text("hud.alive") : text("hud.out")}</em></div>`;
   }).join("");
 }

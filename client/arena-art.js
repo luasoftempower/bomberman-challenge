@@ -13,6 +13,9 @@ export function drawPropFrame(context,source,kind,x,y,width,height,alpha=1){
  context.restore();return true;
 }
 
+// Usado pelo cache da arena em render.js: a camada estática é refeita quando a arte termina de carregar.
+export function isArenaArtReady(){return ready;}
+
 export function drawArenaProp(context,kind,x,y,width,height,alpha=1){
  if(!ready)return false;
  return drawPropFrame(context,image,kind,x,y,width,height,alpha);

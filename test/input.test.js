@@ -54,3 +54,32 @@ test("Space on the language control keeps native button activation and does not 
     else globalThis.document = originalDocument;
   }
 });
+
+test("local input exposes a numbered turn intent for client prediction", () => {
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+  const listeners = new Map();
+  globalThis.window = {
+    addEventListener: (type, listener) => listeners.set(type, listener),
+    removeEventListener: (type) => listeners.delete(type),
+  };
+  globalThis.document = { querySelectorAll: () => [], addEventListener: () => {}, removeEventListener: () => {} };
+  const localInputs = [];
+  let stop;
+  try {
+    stop = createInputController(() => {}, (input) => localInputs.push(input));
+    const event = { code: "KeyS", key: "s", target: { closest: () => false }, preventDefault: () => {} };
+    listeners.get("keydown")(event);
+    listeners.get("keyup")(event);
+
+    assert.equal(localInputs.at(-1).direction, "down");
+    assert.equal(localInputs.at(-1).directionSequence, 1);
+    assert.equal(localInputs.at(-1).dy, 0);
+  } finally {
+    stop?.();
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
+});
