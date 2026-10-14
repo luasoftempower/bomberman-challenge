@@ -317,7 +317,7 @@ test("a lone bot clears random arenas without killing itself", () => {
   }
 });
 
-test("only Super Bomberlan reveals powerups from destroyed crates", () => {
+test("only RAIVOLT Overdrive reveals powerups from destroyed crates", () => {
   for (const mode of [GAME_MODES.CLASSIC, GAME_MODES.SUPER]) {
     const state = baseState();
     state.mode = mode;
@@ -331,7 +331,7 @@ test("only Super Bomberlan reveals powerups from destroyed crates", () => {
   }
 });
 
-test("the ten Super Bomberlan powerups apply their stats and abilities", () => {
+test("the ten RAIVOLT Overdrive powerups apply their stats and abilities", () => {
   const state = baseState();
   state.mode = GAME_MODES.SUPER;
   const player = state.players[0];

@@ -891,10 +891,10 @@ test("a disconnected human becomes a bot during play", () => {
 
 
 // ============================================================
-// SUPER BOMBERLAN
+// RAIVOLT OVERDRIVE
 // ============================================================
 
-test("the host can select Super Bomberlan with a three-minute round", () => {
+test("the host can select RAIVOLT Overdrive with a three-minute round", () => {
   const room = new Room(
     "ABC234",
     "host-secret",
@@ -949,7 +949,7 @@ test("the host can select Super Bomberlan with a three-minute round", () => {
 });
 
 
-test("Super Bomberlan starts dropping death blocks in the final 45 seconds", () => {
+test("RAIVOLT Overdrive starts dropping death blocks in the final 45 seconds", () => {
   const room = new Room(
     "ABC234",
     "host-secret",

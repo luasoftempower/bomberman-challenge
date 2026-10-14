@@ -1,11 +1,11 @@
 const menuTheme = new Audio("/sounds/menu.mp3");
-const superMenuTheme = new Audio("/sounds/menusuperbomberlan.mp3");
+const superMenuTheme = new Audio("/sounds/menu-overdrive.mp3");
 const hoverSound = new Audio("/sounds/scrollmouse.mp3");
 const clickSound = new Audio("/sounds/clickbutton.mp3");
 const luaSoftSound = new Audio("/sounds/luasoft.mp3");
 const countdownSound = new Audio("/sounds/contagemregressiva.mp3");
 const battleTheme = new Audio("/sounds/battletheme.mp3");
-const superBattleTheme = new Audio("/sounds/superbomberlan.mp3");
+const superBattleTheme = new Audio("/sounds/battle-overdrive.mp3");
 const deathSound = new Audio("/sounds/deathsound.mp3");
 const walkingSound = new Audio("/sounds/walking.wav");
 const bombExplosionSound = new Audio("/sounds/bombexploding.wav");

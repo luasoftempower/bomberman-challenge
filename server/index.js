@@ -52,7 +52,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 server.listen(port, "0.0.0.0", () => {
-  console.log(`Bomberlan ready at http://localhost:${port}`);
+  console.log(`RAIVOLT ready at http://localhost:${port}`);
 });
 
 server.on("upgrade", (request, socket, head) => {

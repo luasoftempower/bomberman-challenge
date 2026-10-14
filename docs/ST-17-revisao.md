@@ -16,4 +16,4 @@ Remoto mostra E e o botão REMOTO; luva mostra Q e o botão LUVA. Chute explica 
 
 Execute `npm run dev` e abra `http://localhost:3000/test/power-legend-preview.html`. A prévia usa a simulação, o renderizador e o componente reais com poderes já ativos. Os botões permitem expirar o colete, eliminar o jogador e trocar PT/EN. Esta página de teste não faz parte do build de produção.
 
-Para conferir a integração, crie uma sala no jogo, selecione Super Bomberlan, inicie a partida e colete itens. A lista deve exibir somente os poderes do seu personagem, preservando a expansão escolhida enquanto os snapshots chegam.
+Para conferir a integração, crie uma sala no jogo, selecione RAIVOLT Overdrive, inicie a partida e colete itens. A lista deve exibir somente os poderes do seu personagem, preservando a expansão escolhida enquanto os snapshots chegam.
