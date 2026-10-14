@@ -193,7 +193,7 @@ function sameMoveTarget(first, second) {
 /**
  * Aproxima duas posições sem criar movimento diagonal.
  *
- * A simulação do Bomberlan anda apenas em um eixo por vez. Fazer uma
+ * A simulação do RAIVOLT anda apenas em um eixo por vez. Fazer uma
  * interpolação comum em X e Y produziria um corte diagonal perceptível quando
  * cliente e servidor discordassem sobre uma curva. Por isso corrigimos primeiro
  * o eixo que possui o maior erro.

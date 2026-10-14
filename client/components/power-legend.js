@@ -5,11 +5,11 @@ import { text } from "../i18n/index.js";
 // Cada item guarda o tipo do poder e seu ícone.
 // Remoto e luva também guardam a tecla e o texto do botão de toque.
 const POWERS = [
-  ["fire", "🔥"], ["bomb", "💣"], ["speed", "🛼"],
+  ["fire", "⚡"], ["bomb", "🔋"], ["speed", "🛼"],
   ["remote", "📡", "E", "controls.remote"],
   ["glove", "🧤", "Q", "controls.glove"],
   ["kick", "🥾"], ["bombPass", "👻"], ["blockPass", "🧱"],
-  ["suit", "🛡️"], ["fullFire", "☀️"],
+  ["suit", "🛡️"], ["fullFire", "🌩️"],
 ];
 
 // Descobre os poderes ativos usando os dados atuais do jogador enviados pelo servidor.
@@ -19,8 +19,8 @@ export function activePowers(player, grid) {
   const { width, height } = gridDimensions(grid);
   // O alcance máximo depende do tamanho da arena.
   const fullFire = player.fireRange >= Math.max(width, height);
-  // Mantém só os poderes ativos. Bombas, fogo e patins precisam superar o valor inicial.
-  // Quando há fogo cheio, mostramos apenas ele para não repetir o poder de fogo.
+  // Mantém só os poderes ativos. Cargas, alcance e patins precisam superar o valor inicial.
+  // Quando há alta tensão, mostramos apenas ela para não repetir o poder de alcance.
   return POWERS.filter(([type]) => {
     if (type === "fire") return player.fireRange > BLAST_RANGE && !fullFire;
     if (type === "fullFire") return fullFire;

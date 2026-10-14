@@ -1,0 +1,14 @@
+# Arena ilustrada — RAIVOLT
+
+Arte criada com **imagegen integrado** em 04/10/2026, para acompanhar os ciborgues ilustrados mantendo o cenário legível.
+
+- `public/arena-props.png`: folha fonte com transparência, 1254 × 1254.
+- `client/arena-atlas-data.js`: recortes alfa de parede, módulo destrutível, carga ciano e carga em alerta rosa.
+- `client/arena-art.js`: desenho compartilhado com restauração de estado do Canvas.
+- `scripts/prepare-arena.ps1`: mede os recortes sem alterar a arte fonte.
+
+A carga aparece na arena, no malabarismo e nos ícones de itens através do mesmo renderizador. O alerta usa o limiar e a cadência anteriores. Os blocos que caem também usam a nova parede, mantendo o aviso vermelho. O piso fica em Canvas com planos foscos e sombras sutis nas juntas. Colisões, tempos, dano e distribuição do mapa não mudaram. Desenhos geométricos permanecem como alternativa se o carregamento da imagem falhar.
+
+## Prompt final
+
+Production ready polished hand-painted pixel art game prop sprite atlas for a top-down electric arena RPG. EXACTLY FOUR separate sprites in a precise 2 columns by 2 rows square sheet on true transparent background. Each sprite centered in its quadrant with generous transparent gutter, never crossing quadrants. Same overhead three-quarter RPG camera, front face visible slightly, NOT isometric diamond. Row1 col1: indestructible square steel power station block, wide uninterrupted dark blue-gray steel planes, nicely beveled rounded corners, convincing soft volume, restrained painterly pixel highlights, a single subtle cyan recessed horizontal status light. Row1 col2: destructible copper supply crate, warm desaturated copper side framing, two dark bronze inset panels, a single attractive centered hexagonal latch, visible softly lit top plane and shaded front face, rounded bevels. Row2 col1: compact electric arc charge device, squat cylindrical capsule with two curved graphite metal side supports, silver rim, beautiful bright cyan glass energy core, gentle cyan internal glow, grounded stable feet, no black bomb sphere and no fuse, no spark clutter. Row2 col2: EXACT SAME charge design and scale in its pre-discharge alert state, warm pink-white core with pink light subtly reflecting on metal. Each upper block fills about 75% width and 70% height of its cell, each bottom charge fills about 55% width and 65% height. Four isolated full objects, absolutely no text, no labels, no grid, no scenery, no background. Refined premium indie RPG sprite art, appealing volumes and carefully placed pixel clusters rather than primitive squares. Clear silhouettes, clean and simple surfaces, LIMITED details to avoid visual noise when repeated many times. Light from upper left consistently. No excessive cables, stripes, bolts, busy circuits or warning symbols. Sharp pixel art edges, transparent alpha. Square 1024x1024.
