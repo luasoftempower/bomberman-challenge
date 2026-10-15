@@ -7,6 +7,9 @@ import { BLAST_SECONDS, CRATE, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../s
 // pode liberar automaticamente o contexto e o cache associados a ele.
 const gameContexts = new WeakMap();
 const staticArenaLayers = new WeakMap();
+// Reutilizado entre quadros para não criar Set e strings intermediárias com
+// map() durante cada desenho da arena.
+const liveDischargeKeys = new Set();
 
 const px = (context, color, x, y, width, height) => {
   context.fillStyle = color;
@@ -166,8 +169,14 @@ export function drawBlast(context, blast, animationTime, occupied) {
  if(remaining<=0)return;
  const age=1-remaining/BLAST_SECONDS,growth=Math.min(1,.4+age*6);
  const strength=age<.18?.55+age*2.5:Math.max(.18,1-Math.pow((age-.18)/.82,2));
- const frame=Math.floor(animationTime*24);
- const noise=n=>{const v=Math.sin((blast.x*71+blast.y*137+frame*19+n*31)*1.739)*43758.5453;return v-Math.floor(v);};
+ // A geometria muda em 18 quadros por segundo. O estilo continua elétrico,
+ // mas evita recalcular dezenas de curvas em todo refresh de monitores rápidos.
+ const frame=Math.floor(animationTime*18);
+ const noise=n=>{
+  let value=(blast.x*73856093)^(blast.y*19349663)^(frame*83492791)^(n*2654435761);
+  value=Math.imul(value^(value>>>16),2246822507);
+  return ((value^(value>>>13))>>>0)/4294967295;
+ };
  const links=[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>occupied?.has((blast.x+dx)+','+(blast.y+dy)));
  const paths=links.length?links:[[1,0],[-1,0],[0,1],[0,-1]];
  context.save();context.beginPath();context.rect(x,y,TILE_SIZE,TILE_SIZE);context.clip();
@@ -175,8 +184,8 @@ export function drawBlast(context, blast, animationTime, occupied) {
  px(context,'rgba(71,176,213,.10)',x+1,y+1,38,38);
  context.lineJoin='round';context.lineCap='round';
  const stroke=(points,branch=false)=>{
-  const layers=branch?[[`rgba(35,197,241,${.16*strength})`,4],[`rgba(100,233,255,${.75*strength})`,1],[`rgba(230,255,255,${strength})`,.45]]:
-   [[`rgba(31,166,219,${.10*strength})`,9],[`rgba(35,202,237,${.24*strength})`,4.5],[`rgba(89,230,255,${strength})`,1.8],[`rgba(235,255,255,${strength})`,.8]];
+  const layers=branch?[[`rgba(35,197,241,${.20*strength})`,3.5],[`rgba(220,255,255,${strength})`,.8]]:
+   [[`rgba(31,166,219,${.14*strength})`,8],[`rgba(89,230,255,${.82*strength})`,2.4],[`rgba(235,255,255,${strength})`,.8]];
   for(const [color,width] of layers){context.strokeStyle=color;context.lineWidth=width;context.beginPath();points.forEach(([a,b],i)=>i?context.lineTo(x+a,y+b):context.moveTo(x+a,y+b));context.stroke();}
  };
  paths.forEach(([dx,dy],index)=>{
@@ -186,7 +195,9 @@ export function drawBlast(context, blast, animationTime, occupied) {
    points.push([20+dx*length-dy*offset,20+dy*length+dx*offset]);
   }
   stroke(points);
-  if(age<.8){const [a,b]=points[3],sign=noise(index+80)>.5?1:-1;
+  // Um único arco secundário alterna entre as direções. Antes cada braço
+  // criava outro conjunto de traços, multiplicando o custo em explosões longas.
+  if(age<.8&&index===frame%paths.length){const [a,b]=points[3],sign=noise(index+80)>.5?1:-1;
    stroke([[a,b],[a+dx*3-dy*sign*4,b+dy*3+dx*sign*4],[a-dy*sign*7,b+dx*sign*7],[a+dx*3-dy*sign*9,b+dy*3+dx*sign*9]],true);
   }
  });
@@ -408,10 +419,10 @@ export function renderGame(canvas, state) {
     0,
   );
   for (const powerup of state.powerups || []) drawPowerup(context, powerup, animationTime);
-  const liveDischarges = new Set((state.blasts || []).map(({x,y}) => `${x},${y}`));
-  for (const blast of state.blasts || []) drawBlast(context, blast, animationTime, liveDischarges);
+  liveDischargeKeys.clear();
+  for (const { x, y } of state.blasts || []) liveDischargeKeys.add(`${x},${y}`);
+  for (const blast of state.blasts || []) drawBlast(context, blast, animationTime, liveDischargeKeys);
   for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
   for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
   for (const block of state.fallingBlocks || []) drawFallingBlock(context, block, animationTime);
 }
-

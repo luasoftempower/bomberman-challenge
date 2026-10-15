@@ -122,6 +122,13 @@ export function projectLocalPlayer(target, state, input, horizonMs, predictionSt
     moveTarget: target.moveTarget ? { ...target.moveTarget } : null,
     predictedDirectionSequence: predictionState.predictedDirectionSequence || 0,
   };
+  // O servidor não processa entradas de jogadores eliminados. A previsão local
+  // precisa obedecer à mesma regra; caso contrário, o cadáver ainda avançava
+  // visualmente enquanto uma tecla permanecia pressionada.
+  if (target.alive === false) {
+    projected.moveTarget = null;
+    return projected;
+  }
   const authoritativeDirection = directionToTarget(projected);
   const intent = pendingDirection(projected, input);
   if (intent && sameDirection(intent, authoritativeDirection)) {
@@ -155,6 +162,10 @@ export function projectLocalPlayer(target, state, input, horizonMs, predictionSt
 
 export function advanceLocalPlayer(current, state, input, elapsedMs) {
   const advanced = { ...current, moveTarget: current.moveTarget ? { ...current.moveTarget } : null };
+  if (current.alive === false) {
+    advanced.moveTarget = null;
+    return advanced;
+  }
   let remaining = Math.max(0, elapsedMs) / 1000;
   let segments = 0;
 
@@ -223,6 +234,13 @@ function correctAlongOneAxis(current, target, maximumTravel, useTargetRoute = fa
 }
 
 export function reconcileLocalPlayer(current, target, state, input, elapsedMs, predictionMs) {
+  if (target.alive === false) {
+    return {
+      ...target,
+      moveTarget: null,
+      predictedDirectionSequence: current.predictedDirectionSequence || 0,
+    };
+  }
   const advanced = advanceLocalPlayer(current, state, input, elapsedMs);
   const projected = projectLocalPlayer(target, state, input, predictionMs, current);
   const dx = projected.x - advanced.x;
@@ -231,7 +249,7 @@ export function reconcileLocalPlayer(current, target, state, input, elapsedMs, p
   const playerSpeed = target.moveSpeed || MOVE_SPEED;
   const elapsedSeconds = Math.max(0, elapsedMs) / 1000;
   const hardDesync = separation > TILE_SIZE * 1.25;
-  if (separation > TILE_SIZE * 3 || target.alive === false) return projected;
+  if (separation > TILE_SIZE * 3) return projected;
   if (hardDesync) {
     // Depois de um pico longo de rede, recupera em alta velocidade sem saltar
     // instantaneamente várias casas. Desvios extremos ainda são reposicionados.

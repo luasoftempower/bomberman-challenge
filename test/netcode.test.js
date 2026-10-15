@@ -57,6 +57,32 @@ test("an idle player still converges to an authoritative correction", () => {
   assert(result.x > target.x);
 });
 
+test("an eliminated local player cannot be moved by client prediction", () => {
+  const target = {
+    id: "self",
+    x: 100,
+    y: 60,
+    alive: false,
+    moveSpeed: 112,
+    facing: "right",
+    moveTarget: { x: 140, y: 60, tileX: 3, tileY: 1 },
+  };
+  const current = { ...target, x: 118, moveTarget: { ...target.moveTarget } };
+  const result = reconcileLocalPlayer(
+    current,
+    target,
+    stateWith(target),
+    { dx: 1, dy: 0, direction: "right", directionSequence: 8 },
+    16,
+    120,
+  );
+
+  assert.equal(result.x, target.x);
+  assert.equal(result.y, target.y);
+  assert.equal(result.moveTarget, null);
+  assert.equal(result.alive, false);
+});
+
 test("continuous local prediction stays within a bounded lead of a delayed server", () => {
   const target = { id: "self", x: 80, y: 60, moveSpeed: 112, facing: "right", moveTarget: { x: 100, y: 60, tileX: 2, tileY: 1 } };
   const state = stateWith(target);

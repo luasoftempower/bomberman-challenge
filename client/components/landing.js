@@ -38,7 +38,7 @@ function landingHeader(playerName) {
       ${brand()}
       <div class="player-preferences">
         ${playerProfile(playerName)}
-        ${settingsMenu()}
+        ${settingsMenu({ showReplayIntro: true })}
       </div>
       <div class="status-pill"><i></i> ${text("menu.online")}</div>
     </header>

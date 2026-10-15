@@ -3,6 +3,7 @@
 .settings-menu.is-open { z-index:30; }
 /* Desktop é o padrão. display:none retira a versão mobile do layout e do foco. */
 .settings-mobile { display:none; }
+.settings-desktop { display:flex; align-items:center; gap:8px; }
 /* A largura acompanha o nome do idioma; o raio alto produz o formato de pill. */
 .settings-desktop .language-toggle {
   width:auto;
@@ -15,6 +16,20 @@
   box-shadow:2px 3px 0 #080b14;
 }
 .settings-desktop .language-toggle:hover { border-color:var(--lime); }
+.settings-desktop .intro-replay-button {
+  width:auto;
+  min-height:38px;
+  padding:7px 11px;
+  border:2px solid #75569f;
+  border-radius:999px;
+  background:linear-gradient(145deg,#29203d,#151020);
+  box-shadow:2px 3px 0 #080b14;
+  color:#dcd5e8;
+  font:500 9px Silkscreen,monospace;
+  white-space:nowrap;
+}
+.settings-desktop .intro-replay-button span { color:var(--lime); font-size:15px; }
+.settings-desktop .intro-replay-button:hover { border-color:var(--lime); color:#fff; }
 /* Até 680px, inverte os controles visíveis. O mesmo limite é usado no JS
    para fechar o painel e ajustar o foco quando o tamanho da tela muda. */
 @media (max-width:680px) {
@@ -63,7 +78,7 @@
   position:absolute;
   top:calc(100% + 8px);
   right:0;
-  width:156px;
+  width:190px;
   padding:4px;
   border:2px solid #75569f;
   border-radius:4px;
@@ -79,6 +94,8 @@
 .settings-menu-panel::before { content:""; position:absolute; top:-5px; right:13px; width:6px; height:6px; background:var(--lime); box-shadow:2px 2px 0 #080b14; }
 .settings-menu-item { display:flex; align-items:center; color:#f6f3ff; font:600 14px "Pixelify Sans",sans-serif; border-radius:2px; width:100%; min-width:0; min-height:38px; padding:6px; gap:7px; border:1px solid #a675ff35; box-shadow:none; background:#a675ff0c; text-align:left; }
 .settings-menu-item:hover { background:#a675ff20; border-color:var(--lime); }
+.settings-menu-panel .intro-replay-button { margin-bottom:4px; font:500 9px Silkscreen,monospace; }
+.settings-menu-panel .intro-replay-button span { color:var(--lime); font-size:16px; }
 .lobby-nav > .settings-menu { margin-left:auto; }
 .game-header > .settings-menu { order:4; }
 /* Mantém o painel acima da arte e das linhas de informação do lobby. */

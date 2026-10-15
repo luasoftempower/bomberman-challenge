@@ -31,6 +31,8 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 - 🔌 **Tempo Real:** Comunicação via WebSocket usando arquitetura autoritativa.
 - ⏱️ **Dois Modos:** Raivolt clássico (1:30, sem itens) e Raivolt Overdrive (3:00, power-ups e Sudden Death).
 - 💥 **Dez Power-ups:** Alcance elétrico, Carga, Patins, Controle Remoto, Luva, Chute, Passagem de Carga, Passagem de Bloco, Colete e Alta Tensão.
+- ⏭️ **Introdução flexível:** Pule a apresentação imediatamente ou reveja-a pelo menu principal.
+- ⚡ **Movimento responsivo:** Predição, reconciliação e renderização revisadas para reduzir travamentos sem abrir mão do servidor autoritativo.
 
 ---
 
@@ -174,6 +176,17 @@ Os [prints comentados da ST-16](docs/evidencias/st-16/README.md) mostram como a 
 5. Crie uma sala e verifique a troca no lobby, preservando o nome do jogador e o código da sala.
 
 Na validação local dos ajustes da revisão, os **55 testes automatizados passaram**, o **build de produção foi concluído** e os fluxos de desktop, mobile, teclado e criação de sala foram conferidos no navegador. O teste de chaves de tradução também verifica os componentes extraídos.
+
+## ⏭️ Introdução e estabilidade (ST-18)
+
+A ST-18 adiciona o atalho **Pular intro**, a opção **Rever intro**, impede que
+personagens eliminados continuem respondendo à predição local e otimiza o ciclo
+de renderização, reconciliação e atualização do HUD. Também corrige o deslocamento
+da página ao sair do lobby para a partida.
+
+Consulte o [README visual da ST-18](docs/evidencias/st-18/README.md) para ver os
+prints, a explicação técnica, os testes automatizados e o roteiro de validação
+manual.
 
 ## 📈 Estado Atual e Contribuições
 

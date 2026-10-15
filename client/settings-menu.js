@@ -1,6 +1,8 @@
 // O módulo de idiomas cuida dos textos, da bandeira e da troca PT/EN.
 // Este arquivo cuida da apresentação dos controles e do estado aberto/fechado.
-import { attr, languageButton } from "./i18n/index.js";
+import { attr, languageButton, text } from "./i18n/index.js";
+
+export const REPLAY_INTRO_EVENT = "raivolt:replay-intro";
 
 // A abertura e o cabeçalho podem existir juntos. O contador evita IDs repetidos
 // e permite que cada botão indique seu próprio painel pelo aria-controls.
@@ -11,10 +13,22 @@ let menuId = 0;
 // aria-expanded informa se o menu está aberto; aria-hidden e inert começam
 // bloqueando a leitura e a interação com o painel fechado.
 // Novas opções do mobile podem entrar no painel settings-menu-panel abaixo.
-export function settingsMenu() {
+function replayIntroButton() {
+  return `<button
+    class="settings-menu-item intro-replay-button"
+    data-replay-intro
+    type="button"
+    ${attr("aria-label", "settings.replayIntroLabel")}
+    ${attr("title", "settings.replayIntroLabel")}
+  ><span aria-hidden="true">↻</span>${text("settings.replayIntro")}</button>`;
+}
+
+export function settingsMenu({ showReplayIntro = false } = {}) {
   const panelId = `settings-panel-${++menuId}`;
+  const replayButton = showReplayIntro ? replayIntroButton() : "";
   return `<div class="settings-menu" data-settings-menu>
     <div class="settings-desktop">
+      ${replayButton}
       ${languageButton()}
     </div>
     <div class="settings-mobile">
@@ -39,6 +53,7 @@ export function settingsMenu() {
         aria-hidden="true"
         inert
       >
+        ${replayButton}
         ${languageButton()}
       </div>
     </div>
@@ -87,6 +102,12 @@ export function initializeSettingsMenu() {
     // closest encontra o menu mesmo quando o clique vem da bandeira ou de uma linha.
     const menu = event.target.closest("[data-settings-menu]");
     closeMenus(menu);
+    if (event.target.closest("[data-replay-intro]")) {
+      event.preventDefault();
+      setMenuOpen(menu, false);
+      document.dispatchEvent(new CustomEvent(REPLAY_INTRO_EVENT));
+      return;
+    }
     if (event.target.closest("[data-settings-toggle]")) {
       // Inverte o estado somente no botão de três linhas. A troca de idioma
       // é tratada pelo i18n e mantém o painel aberto para mostrar a nova escolha.

@@ -12,7 +12,7 @@ import { brand } from "./components/brand.js";
 import { landingMarkup, createRoomButtonContent } from "./components/landing.js";
 import { compactPowerupLegendMarkup, initializeGameplayGuide, paintPowerupIcons } from "./components/gameplay-guide.js";
 import { initializeMenuIntro } from "./components/menu-intro.js";
-import { settingsMenu, initializeSettingsMenu } from "./settings-menu.js";
+import { REPLAY_INTRO_EVENT, settingsMenu, initializeSettingsMenu } from "./settings-menu.js";
 import { t, text, attr, setText, initializeLanguage } from "./i18n/index.js";
 import { escapeHtml } from "./utils/html.js";
 import { formatMatchTime } from "./utils/format-time.js";
@@ -56,6 +56,9 @@ import {
 // as telas são substituídas, pois usam delegação de eventos no document.
 initializeLanguage();
 initializeSettingsMenu();
+document.addEventListener(REPLAY_INTRO_EVENT, () => {
+  renderLanding({ forceIntro: true });
+});
 
 // ============================================================
 // CONFIGURAÇÕES
@@ -72,7 +75,6 @@ const MAX_PREDICTION_MS = 650;
 // Mesmo em rede local há alguns milissegundos entre snapshots. Este piso evita
 // uma microparada visual quando um snapshot novo zera a sua idade.
 const MIN_ACTIVE_PREDICTION_MS = 35;
-
 // Tempo da transição entre lobby e partida.
 const MATCH_TRANSITION_MS = 680;
 
@@ -116,7 +118,6 @@ let localInput = {
 
 // Controle da renderização.
 let animationFrame = null;
-let lastFrameAt = 0;
 
 // Evita reconstruir o HUD quando nada relevante mudou.
 let lastHudSignature = "";
@@ -278,13 +279,49 @@ function updateLocalDisplay(
 function startRenderLoop() {
   cancelAnimationFrame(animationFrame);
 
-  lastFrameAt = performance.now();
+  let lastFrameAt = performance.now();
+  // A arena não muda durante uma partida. Guardar essas estruturas evita
+  // consultas ao DOM e alocações de Map em cada quadro, reduzindo pausas do GC.
+  const canvas = root.querySelector(".arena-wrap canvas");
+  const displayById = new Map();
+  // Estatísticas leves, apenas no servidor de desenvolvimento, permitem medir
+  // a cadência real no navegador sem inserir elementos ou afetar a partida.
+  const renderStats = import.meta.env.DEV
+    ? {
+        frames: 0,
+        totalGapMs: 0,
+        maxGapMs: 0,
+        over25Ms: 0,
+        startedAt: lastFrameAt,
+      }
+    : null;
+  if (renderStats) globalThis.__raivoltRenderStats = renderStats;
 
   const frame = (now) => {
-    const elapsed = Math.min(50, now - lastFrameAt);
+    // requestAnimationFrame já acompanha a frequência física da tela. O antigo
+    // prazo manual de 60 Hz pulava um refresh inteiro quando o timestamp chegava
+    // frações de milissegundo antes do previsto, alternando entre 60 e 30 FPS.
+    const frameGap = Math.max(0, now - lastFrameAt);
+    const elapsed = Math.min(50, frameGap);
     lastFrameAt = now;
-
-    const canvas = root.querySelector("canvas");
+    if (renderStats) {
+      renderStats.frames += 1;
+      renderStats.totalGapMs += frameGap;
+      renderStats.maxGapMs = Math.max(renderStats.maxGapMs, frameGap);
+      if (frameGap > 25) renderStats.over25Ms += 1;
+      renderStats.averageGapMs = renderStats.totalGapMs / renderStats.frames;
+      renderStats.elapsedMs = now - renderStats.startedAt;
+      if (renderStats.frames % 60 === 0) {
+        root.dataset.renderStats = JSON.stringify({
+          frames: renderStats.frames,
+          elapsedMs: Math.round(renderStats.elapsedMs),
+          fps: Number((renderStats.frames * 1000 / renderStats.elapsedMs).toFixed(1)),
+          averageGapMs: Number(renderStats.averageGapMs.toFixed(2)),
+          maxGapMs: Number(renderStats.maxGapMs.toFixed(2)),
+          over25Ms: renderStats.over25Ms,
+        });
+      }
+    }
 
     if (canvas && latestSnapshot) {
       if (!displaySnapshot) {
@@ -306,12 +343,10 @@ function startRenderLoop() {
         Math.max(0, snapshotAge) + networkHorizon,
       );
 
-      const displayById = new Map(
-        displaySnapshot.players.map((candidate) => [
-          candidate.id,
-          candidate,
-        ]),
-      );
+      displayById.clear();
+      for (const candidate of displaySnapshot.players) {
+        displayById.set(candidate.id, candidate);
+      }
 
       const players = latestSnapshot.players.map((target) => {
         const current =
@@ -362,10 +397,7 @@ function startRenderLoop() {
         return current;
       });
 
-      displaySnapshot = {
-        ...latestSnapshot,
-        players,
-      };
+      Object.assign(displaySnapshot, latestSnapshot, { players });
 
       renderGame(canvas, displaySnapshot);
     }
@@ -384,6 +416,10 @@ function stopRenderLoop() {
 
   animationFrame = null;
   displaySnapshot = null;
+  if (import.meta.env.DEV) {
+    delete globalThis.__raivoltRenderStats;
+    delete root.dataset.renderStats;
+  }
 }
 
 
@@ -394,7 +430,7 @@ function stopRenderLoop() {
 /**
  * Renderiza a tela inicial do Raivolt.
  */
-function renderLanding() {
+function renderLanding({ forceIntro = false } = {}) {
   setMenuMusicActive(true);
 
   stopVictory();
@@ -402,7 +438,12 @@ function renderLanding() {
   clearRoomTransition();
   stopMatchIntro();
 
-  const showIntro = !introShown;
+  // A abertura volta a aparecer em cada novo acesso. A preferência persistente
+  // usada antes fazia o jogo parecer quebrado depois de um teste que clicasse
+  // em "Pular", porque todas as visitas seguintes abriam direto no menu.
+  // Durante a mesma página ela ainda roda só uma vez; "Rever intro" força a
+  // apresentação novamente e o atalho permite entrar no menu imediatamente.
+  const showIntro = forceIntro || !introShown;
 
   lastLobbyGameMode = null;
   introShown = true;
@@ -820,6 +861,19 @@ function playSnapshotEffects(
   );
 
   setWalkingSoundActive(moved);
+
+  // Interrompe teclado, toque, heartbeat de rede e predição assim que a morte
+  // autoritativa chega. O servidor já ignorava o morto; agora o cliente também.
+  if (nextSelf?.alive === false && stopInput) {
+    stopInput();
+    stopInput = null;
+    localInput = { dx: 0, dy: 0, drop: false, detonate: false, special: false };
+    setWalkingSoundActive(false);
+    root.querySelector(".game-shell")?.classList.add("local-player-out");
+    for (const control of root.querySelectorAll("[data-action]")) {
+      control.disabled = true;
+    }
+  }
 }
 
 
@@ -1017,6 +1071,9 @@ function renderMatch(start) {
   const initialMatchTime = formatMatchTime(start.durationMs || 90_000);
   const roster = start.players.map((candidate) => `<span style="--intro-color:${PLAYER_COLORS[candidate.slot]}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="${escapeHtml(candidate.name)}" /><b>P${candidate.slot + 1}</b></span>`).join("");
   root.innerHTML = `<main class="game-shell match-pending"><header class="game-header">${brand()}${settingsMenu()}<div class="match-label"><span>${text("common.room", { code: player.roomCode })}</span><b>${text("match.lastAlive")}</b></div><div class="match-timer" id="match-timer" role="timer" ${attr("aria-label", "match.timeLabel")}><small>${text("match.time")}</small><b>${initialMatchTime}</b></div></header><section class="game-layout"><div class="arena-wrap"><canvas width="520" height="440" ${attr("aria-label", "match.arena")}></canvas><div class="corner-mark top-left"></div><div class="corner-mark bottom-right"></div></div><aside class="match-sidebar"><div class="panel-title"><span>${text("match.survivors")}</span><b id="alive-count">${text("match.aliveMany", { count: start.players.filter((candidate) => candidate.alive).length })}</b></div><div id="hud-players"></div>${powerLegendMarkup()}<div class="controls-card"><span>${text("controls.title")}</span><p><kbd>WASD</kbd> ${text("controls.or")} <kbd>↑↓←→</kbd> ${text("controls.move")}</p><p><kbd>${text("controls.space")}</kbd> ${text("controls.drop")}</p></div></aside></section><div class="touch-controls" ${attr("aria-label", "controls.touch")}><div class="dpad"><button data-action="up" ${attr("aria-label", "controls.up")}>↑</button><button data-action="left" ${attr("aria-label", "controls.left")}>←</button><button data-action="down" ${attr("aria-label", "controls.down")}>↓</button><button data-action="right" ${attr("aria-label", "controls.right")}>→</button></div><button class="bomb-button" data-action="drop" ${attr("aria-label", "controls.drop")}>${text("controls.bomb")}</button></div></main><section class="match-intro" id="match-intro" role="status" aria-live="assertive"><div class="settings-corner">${settingsMenu()}</div><div class="match-intro-grid" aria-hidden="true"></div><div class="match-intro-burst" aria-hidden="true"></div><div class="match-intro-content"><span class="match-intro-kicker">${text("common.room", { code: player.roomCode })}</span><div class="match-intro-logo"><i></i><img src="/raivolt-logo.png" alt="Raivolt" /></div><div class="countdown-stage"><span>${text("match.starts")}</span><b id="countdown-number">…</b><strong class="go-signal" aria-hidden="true">${text("match.go")}</strong><em id="countdown-label">${text("match.getReady")}</em></div><div class="match-intro-roster">${roster}</div></div></section>`;
+  // O botão de iniciar fica no fim de um lobby alto. Ao trocar todo o DOM, o
+  // navegador preservava aquele scroll e a arena parecia "descer" sozinha.
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   const isSuperMode = start.mode === GAME_MODES.SUPER;
   root.querySelector(".game-shell")?.classList.toggle("super-mode", isSuperMode);
   setText(root.querySelector(".match-label b"), isSuperMode ? "match.super" : "match.classic");
@@ -1030,8 +1087,9 @@ function renderMatch(start) {
   // O modo clássico não tem itens, então a legenda aparece apenas no Super.
   const legend = root.querySelector("#power-legend");
   legend.hidden = !isSuperMode;
-  // Em telas pequenas ou de toque, começa fechada para economizar espaço.
-  legend.open = !window.matchMedia("(max-width: 980px), (hover: none), (max-height: 560px)").matches;
+  // Começa sempre fechada. Abrir automaticamente aumentava a página no mesmo
+  // instante da transição e deslocava a arena, sobretudo em notebooks baixos.
+  legend.open = false;
   renderGame(root.querySelector("canvas"), latestSnapshot);
   updateHud(latestSnapshot);
   startRenderLoop();
@@ -1088,13 +1146,18 @@ function updateHud(state) {
   if (timer) {
     const remainingMs = Number.isFinite(state.remainingMs) ? state.remainingMs : state.durationMs;
     const remainingSeconds = Math.max(0, Math.ceil((Number(remainingMs) || 0) / 1000));
-    timer.querySelector("b").textContent = formatMatchTime(remainingMs);
+    const formattedTime = formatMatchTime(remainingMs);
+    const timerValue = timer.querySelector("b");
+    if (timerValue.textContent !== formattedTime) timerValue.textContent = formattedTime;
     timer.classList.toggle("warning", remainingSeconds <= 30 && remainingSeconds > 10);
     timer.classList.toggle("critical", remainingSeconds <= 10);
     timer.classList.toggle("sudden", Boolean(state.suddenDeathActive));
   }
   const matchLabel = root.querySelector(".match-label b");
-  if (matchLabel && state.suddenDeathActive) setText(matchLabel, "match.suddenDeath");
+  if (matchLabel && state.suddenDeathActive && matchLabel.dataset.suddenDeath !== "true") {
+    matchLabel.dataset.suddenDeath = "true";
+    setText(matchLabel, "match.suddenDeath");
+  }
   const target = root.querySelector("#hud-players");
   if (!target || !state.players) return;
   // A legenda mostra os poderes de quem está jogando neste navegador.
@@ -1102,12 +1165,13 @@ function updateHud(state) {
   const powerList = root.querySelector("#power-list");
   // Guarda um resumo dos poderes e de o jogador estar vivo.
   // Assim, a lista só é refeita quando essas informações mudam.
-  const powerSignature = JSON.stringify([Boolean(self?.alive), activePowers(self, state.grid)]);
+  const powers = activePowers(self, state.grid);
+  const powerSignature = JSON.stringify([Boolean(self?.alive), powers]);
   if (powerList && powerList.dataset.signature !== powerSignature) {
     // Atualiza só o conteúdo: a legenda continua aberta ou fechada como o jogador escolheu.
     powerList.innerHTML = powerListMarkup(self, state.grid);
     powerList.dataset.signature = powerSignature;
-    root.querySelector("#power-count").textContent = activePowers(self, state.grid).length;
+    root.querySelector("#power-count").textContent = powers.length;
   }
   const signature = state.players.map((candidate) => `${candidate.id}:${candidate.alive}:${candidate.kind}:${candidate.maxBombs}:${candidate.fireRange}:${candidate.moveSpeed}:${candidate.remote}:${candidate.glove}:${candidate.kick}:${candidate.bombPass}:${candidate.blockPass}:${candidate.protected}`).join("|");
   if (signature === lastHudSignature) return;
