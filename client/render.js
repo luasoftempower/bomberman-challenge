@@ -1,4 +1,5 @@
 import { drawArenaProp, isArenaArtReady } from "./arena-art.js";
+import { drawEnergyTile } from './map-art.js';
 import { CHARACTERS, drawCyborg, drawCharge } from "./identity.js";
 import { arenaDimensions, isArenaBoundary } from "../shared/arena.js";
 import { BLAST_SECONDS, CRATE, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
@@ -55,8 +56,9 @@ function drawCrate(context,left,top) {
  * Isso elimina centenas de fillRect repetidos em cada frame da partida.
  * A chave inclui o carregamento de arena-props.png para não fixar o desenho provisório.
  */
-function staticArenaLayer(canvas, grid, arenaType, columns, rows, width, height) {
-  const key = `${arenaType}:${isArenaArtReady()}:${grid}`;
+function staticArenaLayer(canvas, grid, arenaType, columns, rows, width, height, state) {
+  const themed = state.mapId && state.mapId !== 'original';
+  const key = `${arenaType}:${isArenaArtReady()}:${grid}:${state.mapTheme}:${state.blockColors}`;
   const cached = staticArenaLayers.get(canvas);
   if (cached?.key === key && cached.width === width && cached.height === height) {
     return cached.canvas;
@@ -75,6 +77,10 @@ function staticArenaLayer(canvas, grid, arenaType, columns, rows, width, height)
       if (tile === VOID) continue;
       const left = x * TILE_SIZE;
       const top = y * TILE_SIZE;
+      if (themed) {
+        drawEnergyTile(context, tile, left, top, state.mapTheme, state.blockColors?.[y * columns + x]);
+        continue;
+      }
       drawFloor(context, left, top, x, y);
       if (tile === WALL) drawWall(context, left, top, isArenaBoundary(arenaType, x, y));
       else if (tile === CRATE) drawCrate(context, left, top);
@@ -403,7 +409,7 @@ export function renderGame(canvas, state) {
   context.imageSmoothingEnabled = false;
   context.clearRect(0, 0, width, height);
   context.drawImage(
-    staticArenaLayer(canvas, grid, state.arenaType, columns, rows, width, height),
+    staticArenaLayer(canvas, grid, state.arenaType, columns, rows, width, height, state),
     0,
     0,
   );
