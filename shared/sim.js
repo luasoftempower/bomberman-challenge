@@ -411,10 +411,16 @@ function safeReviveTile(state, player) {
     && !playerOccupies(state, x, y, player.id));
 }
 
-function reviveFromBlast(state, killedPlayers, hitOwners) {
+function reviveFromBlast(state, killedPlayers, hitOwnersByVictim) {
+  // O revive exige eliminar outro jogador vivo. A morte do próprio dono da
+  // bomba não pode contar como acerto, senão ele é enviado à borda e revive
+  // imediatamente no mesmo ciclo.
   if (!killedPlayers.length || state.mode !== GAME_MODES.SUPER || state.suddenDeathActive) return;
   for (const player of state.players) {
-    if (!player.edgeActive || !hitOwners.has(player.id)) continue;
+    if (!player.edgeActive) continue;
+    const rescuedSomeone = killedPlayers.some((killed) => killed.id !== player.id
+      && hitOwnersByVictim.get(killed.id)?.has(player.id));
+    if (!rescuedSomeone) continue;
     const landing = safeReviveTile(state, player);
     if (!landing) continue;
     player.alive = true;
@@ -478,7 +484,7 @@ function detonateBombs(state, initialIds) {
 function applyBlastDamage(state) {
   const lethal = new Set(state.blasts.map((blast) => `${blast.x},${blast.y}`));
   const killedPlayers = [];
-  const hitOwners = new Set();
+  const hitOwnersByVictim = new Map();
   for (const player of state.players) {
     if (!player.alive || player.invincibleUntilTick > state.tick) continue;
     const tile = `${Math.floor(player.x / TILE_SIZE)},${Math.floor(player.y / TILE_SIZE)}`;
@@ -486,11 +492,12 @@ function applyBlastDamage(state) {
       player.alive = false;
       killedPlayers.push(player);
       const [x, y] = tile.split(",").map(Number);
-      for (const id of state.blasts.find((blast) => blast.x === x && blast.y === y)?.ownerIds || []) hitOwners.add(id);
+      const owners = state.blasts.find((blast) => blast.x === x && blast.y === y)?.ownerIds || [];
+      hitOwnersByVictim.set(player.id, new Set(owners));
       if (!sendToEdge(state, player)) player.edgeActive = false;
     }
   }
-  reviveFromBlast(state, killedPlayers, hitOwners);
+  reviveFromBlast(state, killedPlayers, hitOwnersByVictim);
 }
 
 function applyPowerup(state, player, type) {

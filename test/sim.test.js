@@ -140,6 +140,19 @@ test("an edge player's bomb can kill a survivor and revive its owner", () => {
   assert.equal(tileAt(state.grid, Math.floor(edgePlayer.x / TILE_SIZE), Math.floor(edgePlayer.y / TILE_SIZE)), EMPTY);
 });
 
+test("a super player killed by their own bomb stays eliminated on the edge", () => {
+  const state = superState();
+  const player = state.players[0];
+  const x = Math.floor(player.x / TILE_SIZE);
+  const y = Math.floor(player.y / TILE_SIZE);
+  state.bombs = [bomb(1, x, y)];
+
+  forceDetonate(state, [1]);
+
+  assert.equal(player.alive, false);
+  assert.equal(player.edgeActive, true);
+});
+
 test("starting sudden death permanently eliminates players on the edge", () => {
   const state = superState();
   const player = state.players[0];
