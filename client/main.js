@@ -37,6 +37,7 @@ import {
 import { createInputController } from "./input.js";
 import { activeHudPowerups } from "./gameplay-guide.js";
 import { reconcileLocalPlayer } from "./netcode.js";
+import { createLatestSnapshotBuffer } from "./snapshot-buffer.js";
 
 import {
   renderGame,
@@ -145,6 +146,7 @@ let latestSnapshotReceivedAt = 0;
 let estimatedRtt = 0;
 let rttSamples = [];
 let latencyTimer = null;
+let snapshotBuffer = null;
 
 
 // ============================================================
@@ -303,7 +305,10 @@ function startRenderLoop() {
     // prazo manual de 60 Hz pulava um refresh inteiro quando o timestamp chegava
     // frações de milissegundo antes do previsto, alternando entre 60 e 30 FPS.
     const frameGap = Math.max(0, now - lastFrameAt);
-    const elapsed = Math.min(50, frameGap);
+    // O servidor recupera até quatro passos de 25 ms. Usar a mesma janela no
+    // cliente evita que uma pausa curta faça o personagem permanecer atrasado
+    // por vários quadros depois que o navegador já voltou a desenhar.
+    const elapsed = Math.min(100, frameGap);
     lastFrameAt = now;
     if (renderStats) {
       renderStats.frames += 1;
@@ -599,6 +604,10 @@ function connectToRoom(
 
   errorShown = false;
 
+  snapshotBuffer?.clear();
+  const connectionSnapshotBuffer = createLatestSnapshotBuffer(handleMessage);
+  snapshotBuffer = connectionSnapshotBuffer;
+
   const protocol =
     location.protocol === "https:"
       ? "wss:"
@@ -625,15 +634,23 @@ function connectToRoom(
   socket.addEventListener(
     "message",
     (event) => {
-      handleMessage(
-        JSON.parse(event.data),
-      );
+      const message = JSON.parse(event.data);
+      if (message.type === "snapshot") {
+        connectionSnapshotBuffer.push(message);
+        return;
+      }
+      // Eventos de início/fim e lobby precisam observar antes o estado mais
+      // recente que já chegou, sem esperar outro requestAnimationFrame.
+      connectionSnapshotBuffer.flush();
+      handleMessage(message);
     },
   );
 
   socket.addEventListener(
     "close",
     () => {
+      connectionSnapshotBuffer.clear();
+      if (snapshotBuffer === connectionSnapshotBuffer) snapshotBuffer = null;
       clearInterval(latencyTimer);
 
       latencyTimer = null;
