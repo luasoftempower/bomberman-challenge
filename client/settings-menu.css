@@ -30,6 +30,22 @@
 }
 .settings-desktop .intro-replay-button span { color:var(--lime); font-size:15px; }
 .settings-desktop .intro-replay-button:hover { border-color:var(--lime); color:#fff; }
+.settings-desktop .audio-toggle {
+  width:auto;
+  min-height:38px;
+  padding:7px 11px;
+  border:2px solid #75569f;
+  border-radius:999px;
+  background:linear-gradient(145deg,#29203d,#151020);
+  box-shadow:2px 3px 0 #080b14;
+  color:#dcd5e8;
+  font:500 9px Silkscreen,monospace;
+  white-space:nowrap;
+}
+.settings-desktop .audio-toggle:hover { border-color:var(--lime); color:#fff; }
+.audio-toggle-icon { width:19px; display:inline-grid; place-items:center; font-size:15px; line-height:1; }
+.audio-toggle[aria-pressed="true"] { border-color:#ff778f; color:#ffd9df; }
+.audio-toggle[aria-pressed="true"] .audio-toggle-icon { filter:saturate(1.25); }
 /* Até 680px, inverte os controles visíveis. O mesmo limite é usado no JS
    para fechar o painel e ajustar o foco quando o tamanho da tela muda. */
 @media (max-width:680px) {
@@ -96,6 +112,7 @@
 .settings-menu-item:hover { background:#a675ff20; border-color:var(--lime); }
 .settings-menu-panel .intro-replay-button { margin-bottom:4px; font:500 9px Silkscreen,monospace; }
 .settings-menu-panel .intro-replay-button span { color:var(--lime); font-size:16px; }
+.settings-menu-panel .audio-toggle { margin-bottom:4px; font:500 9px Silkscreen,monospace; }
 .lobby-nav > .settings-menu { margin-left:auto; }
 .game-header > .settings-menu { order:4; }
 /* Mantém o painel acima da arte e das linhas de informação do lobby. */
