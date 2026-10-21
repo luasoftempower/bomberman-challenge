@@ -99,6 +99,26 @@ test("a super player eliminated by a blast can move only along the perimeter lan
   assert.notDeepEqual([player.x, player.y], original);
 });
 
+test("an edge player can place a bomb from a straight perimeter tile into the arena", () => {
+  const state = superState();
+  const [edgePlayer, target] = state.players;
+  edgePlayer.alive = false;
+  edgePlayer.edgeActive = true;
+  edgePlayer.x = 1.5 * TILE_SIZE;
+  edgePlayer.y = 0.5 * TILE_SIZE;
+  target.x = 1.5 * TILE_SIZE;
+  target.y = 1.5 * TILE_SIZE;
+
+  step(state, { [edgePlayer.id]: { drop: true } });
+  assert.equal(state.bombs.length, 1);
+  assert.equal(state.bombs[0].ownerId, edgePlayer.id);
+
+  forceDetonate(state, [state.bombs[0].id]);
+  assert.equal(target.alive, false);
+  assert.equal(edgePlayer.alive, true);
+  assert.equal(edgePlayer.edgeActive, false);
+});
+
 test("an edge player's bomb can kill a survivor and revive its owner", () => {
   const state = superState();
   const [edgePlayer, target] = state.players;

@@ -867,7 +867,10 @@ function playSnapshotEffects(
 
   // Interrompe teclado, toque, heartbeat de rede e predição assim que a morte
   // autoritativa chega. O servidor já ignorava o morto; agora o cliente também.
-  if (nextSelf?.alive === false && stopInput) {
+  // No modo Super, a morte transfere o jogador para a borda para que ele ainda
+  // possa se mover e tentar o revive. Só encerre os controles após eliminação
+  // definitiva (fora da arena e sem estado de borda).
+  if (nextSelf?.alive === false && !nextSelf?.edgeActive && stopInput) {
     stopInput();
     stopInput = null;
     localInput = { dx: 0, dy: 0, drop: false, detonate: false, special: false };

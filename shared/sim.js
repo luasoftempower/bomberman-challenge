@@ -368,7 +368,9 @@ function blastTiles(state, bomb) {
 function edgeLaneTiles(state) {
   const { width, height } = gridDimensions(state.grid);
   const tiles = [];
-  for (let x = 0; x < width; x += 1) tiles.push({ x, y: 0 }, { x, y: height - 1 });
+  // Evita os cantos como ponto inicial: a bomba ali ficaria cercada por duas
+  // paredes e não teria uma direção cardinal para alcançar a arena.
+  for (let x = 1; x < width - 1; x += 1) tiles.push({ x, y: 0 }, { x, y: height - 1 });
   for (let y = 1; y < height - 1; y += 1) tiles.push({ x: 0, y }, { x: width - 1, y });
   return tiles;
 }
