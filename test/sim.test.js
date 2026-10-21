@@ -25,6 +25,18 @@ function baseState() {
   return state;
 }
 
+function superState() {
+  const state = createMatch(124, [
+    { id: "p1", slot: 0, name: "One", kind: "human" },
+    { id: "p2", slot: 1, name: "Two", kind: "human" },
+    { id: "p3", slot: 2, name: "Three", kind: "human" },
+  ], { mode: GAME_MODES.SUPER });
+  state.grid = openGrid().join("");
+  state.bombs = [];
+  state.blasts = [];
+  return state;
+}
+
 function bomb(id, x, y, range = 2) {
   return { id, x, y, ownerId: "p1", range, fuse: 2.2, passThroughIds: [] };
 }
@@ -51,6 +63,71 @@ test("a blast crosses empty tiles only up to its range", () => {
   forceDetonate(state, [1]);
   assert(state.blasts.some((blast) => blast.x === 7 && blast.y === 5));
   assert(!state.blasts.some((blast) => blast.x === 8 && blast.y === 5));
+});
+
+test("super fire powerups cap the blast at one third of the arena", () => {
+  const state = superState();
+  const player = state.players[0];
+  player.x = 2.5 * TILE_SIZE;
+  player.y = 5.5 * TILE_SIZE;
+  player.fireRange = 99;
+  state.bombs = [bomb(1, 2, 5, 99)];
+  forceDetonate(state, [1]);
+  assert(state.blasts.some((blast) => blast.x === 5 && blast.y === 5));
+  assert(!state.blasts.some((blast) => blast.x === 6 && blast.y === 5));
+});
+
+test("a super player eliminated by a blast can move only along the perimeter lane", () => {
+  const state = superState();
+  const player = state.players[0];
+  player.x = 5.5 * TILE_SIZE;
+  player.y = 5.5 * TILE_SIZE;
+  state.blasts = [{ x: 5, y: 5, ttl: 1, ownerIds: ["p2"] }];
+  step(state, {});
+  assert.equal(player.alive, false);
+  assert.equal(player.edgeActive, true);
+  player.x = 0.5 * TILE_SIZE;
+  player.y = 5.5 * TILE_SIZE;
+  const edgeX = Math.floor(player.x / TILE_SIZE);
+  const edgeY = Math.floor(player.y / TILE_SIZE);
+  const towardInterior = edgeX === 0 ? { dx: 1 } : edgeX === 12 ? { dx: -1 } : edgeY === 0 ? { dy: 1 } : { dy: -1 };
+  const original = [player.x, player.y];
+  step(state, { p1: towardInterior });
+  assert.deepEqual([player.x, player.y], original);
+  const alongEdge = edgeX === 0 || edgeX === 12 ? { dy: 1 } : { dx: 1 };
+  step(state, { p1: alongEdge });
+  assert.notDeepEqual([player.x, player.y], original);
+});
+
+test("an edge player's bomb can kill a survivor and revive its owner", () => {
+  const state = superState();
+  const [edgePlayer, target] = state.players;
+  edgePlayer.alive = false;
+  edgePlayer.edgeActive = true;
+  edgePlayer.x = 0.5 * TILE_SIZE;
+  edgePlayer.y = 0.5 * TILE_SIZE;
+  target.x = 5.5 * TILE_SIZE;
+  target.y = 5.5 * TILE_SIZE;
+  state.bombs = [bomb(1, 2, 5, 3)];
+  state.bombs[0].ownerId = edgePlayer.id;
+
+  forceDetonate(state, [1]);
+
+  assert.equal(target.alive, false);
+  assert.equal(target.edgeActive, true);
+  assert.equal(edgePlayer.alive, true);
+  assert.equal(edgePlayer.edgeActive, false);
+  assert.equal(tileAt(state.grid, Math.floor(edgePlayer.x / TILE_SIZE), Math.floor(edgePlayer.y / TILE_SIZE)), EMPTY);
+});
+
+test("starting sudden death permanently eliminates players on the edge", () => {
+  const state = superState();
+  const player = state.players[0];
+  player.alive = false;
+  player.edgeActive = true;
+  assert.equal(dropDeathBlock(state, 3, 3), true);
+  assert.equal(player.edgeActive, false);
+  assert.equal(player.alive, false);
 });
 
 test("a bomb caught in a blast detonates on the same tick", () => {

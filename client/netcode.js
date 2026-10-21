@@ -8,6 +8,20 @@ export function cardinalInput(input) {
 }
 
 function tileBlocked(state, self, tileX, tileY) {
+  if (self.edgeActive) {
+    const width = state.grid.length === 23 * 15 ? 23 : 13;
+    const height = state.grid.length === 23 * 15 ? 15 : 11;
+    const onLane = tileX === 0 || tileY === 0 || tileX === width - 1 || tileY === height - 1;
+    if (onLane) {
+      const bomb = state.bombs?.find((candidate) => candidate.x === tileX && candidate.y === tileY && !candidate.airborneTtl);
+      if (bomb && !self.bombPass) return true;
+      return state.players.some((candidate) => {
+        if ((!candidate.alive && !candidate.edgeActive) || candidate.id === self.id) return false;
+        return (Math.floor(candidate.x / TILE_SIZE) === tileX && Math.floor(candidate.y / TILE_SIZE) === tileY)
+          || candidate.moveTarget?.tileX === tileX && candidate.moveTarget?.tileY === tileY;
+      });
+    }
+  }
   const tile = state.grid ? tileAt(state.grid, tileX, tileY) : undefined;
   if (tile !== EMPTY && !(tile === CRATE && self.blockPass)) return true;
   const bomb = state.bombs?.find((candidate) => (
@@ -17,7 +31,7 @@ function tileBlocked(state, self, tileX, tileY) {
   ));
   if (bomb && !self.bombPass) return true;
   return state.players.some((candidate) => {
-    if (!candidate.alive || candidate.id === self.id) return false;
+    if ((!candidate.alive && !candidate.edgeActive) || candidate.id === self.id) return false;
     const occupiesTile = Math.floor(candidate.x / TILE_SIZE) === tileX && Math.floor(candidate.y / TILE_SIZE) === tileY;
     const reservesTile = candidate.moveTarget?.tileX === tileX && candidate.moveTarget?.tileY === tileY;
     return occupiesTile || reservesTile;
@@ -79,6 +93,13 @@ function startPredictedMove(state, player, direction) {
   const currentTileY = Math.round(player.y / TILE_SIZE - 0.5);
   const tileX = currentTileX + direction.x;
   const tileY = currentTileY + direction.y;
+  if (player.edgeActive) {
+    const width = state.grid.length === 23 * 15 ? 23 : 13;
+    const height = state.grid.length === 23 * 15 ? 15 : 11;
+    const onLane = (x, y) => x >= 0 && y >= 0 && x < width && y < height
+      && (x === 0 || y === 0 || x === width - 1 || y === height - 1);
+    if (!onLane(currentTileX, currentTileY) || !onLane(tileX, tileY)) return false;
+  }
   const bomb = state.bombs?.find((candidate) => (
     candidate.x === tileX
     && candidate.y === tileY
@@ -125,7 +146,7 @@ export function projectLocalPlayer(target, state, input, horizonMs, predictionSt
   // O servidor não processa entradas de jogadores eliminados. A previsão local
   // precisa obedecer à mesma regra; caso contrário, o cadáver ainda avançava
   // visualmente enquanto uma tecla permanecia pressionada.
-  if (target.alive === false) {
+  if (target.alive === false && !target.edgeActive) {
     projected.moveTarget = null;
     return projected;
   }
@@ -162,7 +183,7 @@ export function projectLocalPlayer(target, state, input, horizonMs, predictionSt
 
 export function advanceLocalPlayer(current, state, input, elapsedMs) {
   const advanced = { ...current, moveTarget: current.moveTarget ? { ...current.moveTarget } : null };
-  if (current.alive === false) {
+  if (current.alive === false && !current.edgeActive) {
     advanced.moveTarget = null;
     return advanced;
   }

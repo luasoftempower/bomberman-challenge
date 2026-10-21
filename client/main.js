@@ -1017,6 +1017,7 @@ function renderLobby(lobby) {
     ? `<i class="squad-empty" aria-hidden="true">+</i>`
     : `<img src="/player-avatar-${slot.slot + 1}.png" alt="${escapeHtml(slot.name)}" />`).join("");
   root.innerHTML = `<main class="lobby-shell ${firstLobbyRender ? "lobby-entering" : ""} ${gameMode === GAME_MODES.SUPER ? "super-lobby" : ""} ${modeChanged ? `mode-switching ${switchDirection}` : ""}"><div class="lobby-backdrop" aria-hidden="true"><i></i><i></i><i></i></div><nav class="lobby-nav">${brand()}${settingsMenu()}<div class="room-chip"><i></i><span>${text("lobby.active")}</span><b>${escapeHtml(player.roomCode)}</b></div></nav><section class="lobby-heading"><div class="lobby-heading-copy"><div class="eyebrow"><span>●</span> ${text("lobby.waitingRoom")}</div><h2>${text("lobby.build")}<br><strong>${text("lobby.squad")}</strong></h2><p>${isHost ? text("lobby.hostDescription") : text("lobby.guestDescription")}</p></div><aside class="lobby-squad-card"><span>${text("lobby.currentTeam")}</span><b>${onlineCount}<small>/${capacity}</small></b><em>${text("lobby.onlinePlayers")}</em><div class="squad-preview">${squadPreview}</div></aside></section><section class="lobby-grid"><div class="players-panel"><div class="panel-title"><span><i></i> ${text("lobby.roster")}</span><b>${text("lobby.onlineCount", { count: onlineCount, capacity })}</b></div><div class="slot-list">${lobby.slots.map((slot) => slotMarkup(slot, lobby.hostId)).join("")}</div></div><aside class="invite-panel"><div class="invite-panel-heading"><div><span>${text("lobby.invite")}</span><b>${text("lobby.callTeam")}</b></div><i aria-hidden="true">✦</i></div><label>${text("lobby.link")}</label><div class="copy-row"><input readonly value="${escapeHtml(roomUrl)}" ${attr("aria-label", "lobby.roomLink")} /><button id="copy-link" ${attr("aria-label", "lobby.copyLabel")}>${text("lobby.copy")}</button></div><div class="room-pass" ${attr("aria-label", "common.roomCodeValue", { code: player.roomCode })}><div class="pass-pixels" aria-hidden="true"></div><span><small>${text("common.roomCodeLabel")}</small><strong>${escapeHtml(player.roomCode)}</strong><em>${text("lobby.characters")}</em></span></div><p>${text("lobby.linkHelp", { capacity })}</p>${botDifficultyPanel}${botControlPanel}</aside></section><section class="lobby-actions"><div class="lobby-action-copy"><span>${text("lobby.status")}</span><b>${ownSlot?.ready ? text("lobby.youReady") : text("lobby.confirm")}</b></div><button class="ready-button ${ownSlot?.ready ? "active" : ""}" id="ready-button">${ownSlot?.ready ? text("lobby.ready") : text("lobby.imReady")}</button>${isHost ? `<button class="primary start-button" id="start-button"><span><small>${text("common.host")}</small>${text("lobby.start")}</span><b>▶</b></button>` : `<div class="host-wait"><i></i> ${text("common.waitHost")}</div>`}</section></main>`;
+  root.querySelector(".lobby-heading-copy")?.insertAdjacentHTML("beforeend", `<label class="lobby-player-name" for="lobby-player-name"><span>${text("lobby.playerName")}</span><input id="lobby-player-name" maxlength="16" autocomplete="nickname" value="${escapeHtml(ownSlot?.name || getName())}" /><small>${text("lobby.nameHelp")}</small></label>`);
   root.querySelector(".lobby-grid")?.insertAdjacentHTML("beforebegin", modePanel);
   mountMapStudio(root, lobby, isHost, send);
   if (!canUseClassic) {
@@ -1026,6 +1027,12 @@ function renderLobby(lobby) {
   root.querySelector("#remove-bot-button")?.addEventListener("click", () => send({ type: "removeBot" }));
   root.querySelector("#copy-link").addEventListener("click", async () => { await navigator.clipboard.writeText(roomUrl); root.querySelector("#copy-link").innerHTML = text("lobby.copied"); });
   root.querySelector("#ready-button").addEventListener("click", () => send({ type: "ready", ready: !ownSlot?.ready }));
+  root.querySelector("#lobby-player-name")?.addEventListener("change", (event) => {
+    const name = event.currentTarget.value.trim().slice(0, 16) || t("common.defaultName");
+    event.currentTarget.value = name;
+    localStorage.setItem("blast-name", name);
+    send({ type: "playerName", name });
+  });
   for (const button of root.querySelectorAll("[data-bot-difficulty]")) {
     button.addEventListener("click", () => send({ type: "botDifficulty", difficulty: button.dataset.botDifficulty }));
   }
@@ -1167,6 +1174,17 @@ function updateHud(state) {
   if (!target || !state.players) return;
   // A legenda mostra os poderes de quem está jogando neste navegador.
   const self = state.players.find((candidate) => candidate.id === player.playerId);
+  let rescueNotice = root.querySelector("#edge-rescue");
+  if (!rescueNotice && root.querySelector(".match-sidebar")) {
+    rescueNotice = document.createElement("p");
+    rescueNotice.id = "edge-rescue";
+    rescueNotice.className = "edge-rescue";
+    root.querySelector(".match-sidebar").prepend(rescueNotice);
+  }
+  if (rescueNotice) {
+    rescueNotice.hidden = !self?.edgeActive;
+    rescueNotice.textContent = self?.edgeActive ? t("match.edgeRescue") : "";
+  }
   const powerList = root.querySelector("#power-list");
   // Guarda um resumo dos poderes e de o jogador estar vivo.
   // Assim, a lista só é refeita quando essas informações mudam.
@@ -1178,14 +1196,14 @@ function updateHud(state) {
     powerList.dataset.signature = powerSignature;
     root.querySelector("#power-count").textContent = powers.length;
   }
-  const signature = state.players.map((candidate) => `${candidate.id}:${candidate.alive}:${candidate.kind}:${candidate.maxBombs}:${candidate.fireRange}:${candidate.moveSpeed}:${candidate.remote}:${candidate.glove}:${candidate.kick}:${candidate.bombPass}:${candidate.blockPass}:${candidate.protected}`).join("|");
+  const signature = state.players.map((candidate) => `${candidate.id}:${candidate.alive}:${candidate.edgeActive}:${candidate.kind}:${candidate.maxBombs}:${candidate.fireRange}:${candidate.fullFire}:${candidate.moveSpeed}:${candidate.remote}:${candidate.glove}:${candidate.kick}:${candidate.bombPass}:${candidate.blockPass}:${candidate.protected}`).join("|");
   if (signature === lastHudSignature) return;
   lastHudSignature = signature;
   const alive = state.players.filter((candidate) => candidate.alive).length;
   setText(root.querySelector("#alive-count"), alive === 1 ? "match.aliveOne" : "match.aliveMany", { count: alive });
   target.innerHTML = state.players.map((candidate) => {
     const abilities = activeHudPowerups(candidate).map((powerup) => `<i class="${powerup.hudClass || ""}" ${attr("title", powerup.nameKey)}>${powerup.hudBadge}</i>`);
-    return `<div class="hud-player ${candidate.alive ? "" : "dead"}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="" /><span><b>${escapeHtml(candidate.name)}</b><small>${candidate.kind === "bot" ? text("hud.bot") : candidate.id === player.playerId ? text("hud.you") : text("hud.human")} · ${characterFor(candidate.slot).name}</small><span class="hud-stats"><i ${attr("title", "hud.bombs")}>● ${candidate.maxBombs || 2}</i><i ${attr("title", "hud.fire")}>✦ ${candidate.fireRange || 2}</i><i ${attr("title", "hud.speed")}>» ${candidate.moveSpeed || MOVE_SPEED}</i></span><span class="hud-abilities">${abilities.join("")}</span></span><em>${candidate.alive ? text("hud.alive") : text("hud.out")}</em></div>`;
+    return `<div class="hud-player ${candidate.alive ? "" : candidate.edgeActive ? "edge-active" : "dead"}"><img src="/player-avatar-${candidate.slot + 1}.png" alt="" /><span><b>${escapeHtml(candidate.name)}</b><small>${candidate.kind === "bot" ? text("hud.bot") : candidate.id === player.playerId ? text("hud.you") : text("hud.human")} · ${characterFor(candidate.slot).name}</small><span class="hud-stats"><i ${attr("title", "hud.bombs")}>● ${candidate.maxBombs || 2}</i><i ${attr("title", "hud.fire")}>✦ ${candidate.fireRange || 2}</i><i ${attr("title", "hud.speed")}>» ${candidate.moveSpeed || MOVE_SPEED}</i></span><span class="hud-abilities">${abilities.join("")}</span></span><em>${candidate.alive ? text("hud.alive") : candidate.edgeActive ? text("hud.edge") : text("hud.out")}</em></div>`;
   }).join("");
 }
 

@@ -26,7 +26,7 @@ export const POWERUP_TYPES = Object.freeze([
   "fullFire",
 ]);
 export const MAX_BOMBS_LIMIT = 8;
-export const MAX_FIRE_RANGE = Math.max(BOARD_WIDTH, BOARD_HEIGHT);
+export const MAX_FIRE_RANGE = Math.floor(Math.min(BOARD_WIDTH, BOARD_HEIGHT) / 3);
 export const MAX_MOVE_SPEED = 184;
 export const SPEED_UP_AMOUNT = 18;
 export const SUIT_SECONDS = 8;

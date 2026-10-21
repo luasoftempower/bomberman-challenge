@@ -458,6 +458,16 @@ export class Room {
     this.broadcastLobby();
   }
 
+  updatePlayerName(playerId, name) {
+    if (this.phase !== "lobby") return;
+    const slot = this.slots.find((candidate) => candidate.id === playerId && candidate.kind === "human");
+    if (!slot) return;
+    const cleanName = String(name || "Jogador").trim().slice(0, 16) || "Jogador";
+    if (slot.name === cleanName) return;
+    slot.name = cleanName;
+    this.broadcastLobby();
+  }
+
  addBot(playerId) {
   if (
     playerId !== this.hostId ||
