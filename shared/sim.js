@@ -96,6 +96,7 @@ export function createPlayer({ id, slot, name, kind = "human" }, arenaType = ARE
     x: (spawn.x + 0.5) * TILE_SIZE,
     y: (spawn.y + 0.5) * TILE_SIZE,
     alive: true,
+    edgeActive: false,
     dropLatch: false,
     detonateLatch: false,
     specialLatch: false,
@@ -105,6 +106,7 @@ export function createPlayer({ id, slot, name, kind = "human" }, arenaType = ARE
     facing: slot === 0 || slot === 3 ? "right" : "left",
     maxBombs: MAX_BOMBS,
     fireRange: BLAST_RANGE,
+    fullFire: false,
     moveSpeed: MOVE_SPEED,
     remote: false,
     glove: false,
@@ -160,7 +162,7 @@ function bombAt(state, x, y) {
 
 function playerOccupies(state, x, y, ignoredPlayerId = null) {
   return state.players.some((player) => {
-    if (!player.alive || player.id === ignoredPlayerId) return false;
+    if ((!player.alive && !player.edgeActive) || player.id === ignoredPlayerId) return false;
     const currentX = Math.floor(player.x / TILE_SIZE);
     const currentY = Math.floor(player.y / TILE_SIZE);
     return (currentX === x && currentY === y) || (player.moveTarget?.tileX === x && player.moveTarget?.tileY === y);
@@ -239,6 +241,15 @@ function startPlayerMove(state, player, direction) {
   const currentY = Math.round(player.y / TILE_SIZE - 0.5);
   const tileX = currentX + direction.x;
   const tileY = currentY + direction.y;
+  if (player.edgeActive) {
+    const { width, height } = gridDimensions(state.grid);
+    const onLane = (x, y) => x >= 0 && y >= 0 && x < width && y < height
+      && (x === 0 || y === 0 || x === width - 1 || y === height - 1);
+    if (!onLane(currentX, currentY) || !onLane(tileX, tileY)) return false;
+    if (bombAt(state, tileX, tileY) || playerOccupies(state, tileX, tileY, player.id)) return false;
+    player.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
+    return true;
+  }
   if (isTileBlocked(state, tileX, tileY, player, direction)) return false;
   player.moveTarget = { tileX, tileY, x: (tileX + 0.5) * TILE_SIZE, y: (tileY + 0.5) * TILE_SIZE };
   return true;
@@ -339,8 +350,10 @@ function advanceBombMotion(state) {
 
 function blastTiles(state, bomb) {
   const tiles = [{ x: bomb.x, y: bomb.y }];
+  const { width, height } = gridDimensions(state.grid);
+  const maxRange = Math.max(1, Math.floor(Math.min(width, height) / 3));
   for (const direction of DIRECTIONS) {
-    for (let distance = 1; distance <= bomb.range; distance += 1) {
+    for (let distance = 1; distance <= Math.min(bomb.range, maxRange); distance += 1) {
       const x = bomb.x + direction.x * distance;
       const y = bomb.y + direction.y * distance;
       const tile = tileAt(state.grid, x, y);
@@ -350,6 +363,76 @@ function blastTiles(state, bomb) {
     }
   }
   return tiles;
+}
+
+function edgeLaneTiles(state) {
+  const { width, height } = gridDimensions(state.grid);
+  const tiles = [];
+  // Evita os cantos como ponto inicial: a bomba ali ficaria cercada por duas
+  // paredes e não teria uma direção cardinal para alcançar a arena.
+  for (let x = 1; x < width - 1; x += 1) tiles.push({ x, y: 0 }, { x, y: height - 1 });
+  for (let y = 1; y < height - 1; y += 1) tiles.push({ x: 0, y }, { x: width - 1, y });
+  return tiles;
+}
+
+function sendToEdge(state, player) {
+  if (state.mode !== GAME_MODES.SUPER || state.suddenDeathActive) return false;
+  const lane = edgeLaneTiles(state);
+  const position = lane.find(({ x, y }) => !playerOccupies(state, x, y, player.id)
+    && !state.bombs.some((bomb) => bomb.x === x && bomb.y === y));
+  if (!position) return false;
+  player.alive = false;
+  player.edgeActive = true;
+  player.moveTarget = null;
+  player.queuedDirection = null;
+  player.x = (position.x + 0.5) * TILE_SIZE;
+  player.y = (position.y + 0.5) * TILE_SIZE;
+  return true;
+}
+
+function permanentlyEliminateEdgePlayers(state) {
+  const edgeIds = new Set();
+  for (const player of state.players) {
+    if (!player.edgeActive) continue;
+    player.edgeActive = false;
+    edgeIds.add(player.id);
+  }
+  state.bombs = state.bombs.filter((bomb) => !edgeIds.has(bomb.ownerId));
+}
+
+function safeReviveTile(state, player) {
+  const { width, height } = gridDimensions(state.grid);
+  const preferred = spawnsForArena(state.arenaType)[player.slot];
+  const candidates = [preferred, ...Array.from({ length: width * height }, (_, index) => ({ x: index % width, y: Math.floor(index / width) }))];
+  return candidates.find(({ x, y }) => tileAt(state.grid, x, y) === EMPTY
+    && !state.bombs.some((bomb) => bomb.x === x && bomb.y === y)
+    && !state.fallingBlocks.some((block) => block.x === x && block.y === y)
+    && !state.blasts.some((blast) => blast.x === x && blast.y === y)
+    && !playerOccupies(state, x, y, player.id));
+}
+
+function reviveFromBlast(state, killedPlayers, hitOwnersByVictim) {
+  // O revive exige eliminar outro jogador vivo. A morte do próprio dono da
+  // bomba não pode contar como acerto, senão ele é enviado à borda e revive
+  // imediatamente no mesmo ciclo.
+  if (!killedPlayers.length || state.mode !== GAME_MODES.SUPER || state.suddenDeathActive) return;
+  for (const player of state.players) {
+    if (!player.edgeActive) continue;
+    const rescuedSomeone = killedPlayers.some((killed) => killed.id !== player.id
+      && hitOwnersByVictim.get(killed.id)?.has(player.id));
+    if (!rescuedSomeone) continue;
+    const landing = safeReviveTile(state, player);
+    if (!landing) continue;
+    player.alive = true;
+    player.edgeActive = false;
+    player.x = (landing.x + 0.5) * TILE_SIZE;
+    player.y = (landing.y + 0.5) * TILE_SIZE;
+    player.moveTarget = null;
+    player.queuedDirection = null;
+    player.dropLatch = false;
+    player.detonateLatch = false;
+    player.specialLatch = false;
+  }
 }
 
 function choosePowerup(state) {
@@ -379,8 +462,10 @@ function detonateBombs(state, initialIds) {
     for (const tile of blastTiles(state, bomb)) {
       const key = `${tile.x},${tile.y}`;
       const existing = state.blasts.find((blast) => `${blast.x},${blast.y}` === key);
-      if (existing) existing.ttl = BLAST_SECONDS;
-      else state.blasts.push({ ...tile, ttl: BLAST_SECONDS });
+      if (existing) {
+        existing.ttl = BLAST_SECONDS;
+        existing.ownerIds = [...new Set([...(existing.ownerIds || []), bomb.ownerId])];
+      } else state.blasts.push({ ...tile, ttl: BLAST_SECONDS, ownerIds: [bomb.ownerId] });
       const wasCrate = tileAt(state.grid, tile.x, tile.y) === CRATE;
       if (wasCrate) {
         setTile(state, tile.x, tile.y, EMPTY);
@@ -398,15 +483,28 @@ function detonateBombs(state, initialIds) {
 
 function applyBlastDamage(state) {
   const lethal = new Set(state.blasts.map((blast) => `${blast.x},${blast.y}`));
+  const killedPlayers = [];
+  const hitOwnersByVictim = new Map();
   for (const player of state.players) {
     if (!player.alive || player.invincibleUntilTick > state.tick) continue;
     const tile = `${Math.floor(player.x / TILE_SIZE)},${Math.floor(player.y / TILE_SIZE)}`;
-    if (lethal.has(tile)) player.alive = false;
+    if (lethal.has(tile)) {
+      player.alive = false;
+      killedPlayers.push(player);
+      const [x, y] = tile.split(",").map(Number);
+      const owners = state.blasts.find((blast) => blast.x === x && blast.y === y)?.ownerIds || [];
+      hitOwnersByVictim.set(player.id, new Set(owners));
+      if (!sendToEdge(state, player)) player.edgeActive = false;
+    }
   }
+  reviveFromBlast(state, killedPlayers, hitOwnersByVictim);
 }
 
 function applyPowerup(state, player, type) {
-  if (type === "fire") player.fireRange = Math.min(Math.max(...Object.values(gridDimensions(state.grid))), player.fireRange + 1);
+  if (type === "fire") {
+    const { width, height } = gridDimensions(state.grid);
+    player.fireRange = Math.min(Math.floor(Math.min(width, height) / 3), player.fireRange + 1);
+  }
   else if (type === "bomb") player.maxBombs = Math.min(MAX_BOMBS_LIMIT, player.maxBombs + 1);
   else if (type === "speed") player.moveSpeed = Math.min(MAX_MOVE_SPEED, player.moveSpeed + SPEED_UP_AMOUNT);
   else if (type === "remote") player.remote = true;
@@ -415,7 +513,11 @@ function applyPowerup(state, player, type) {
   else if (type === "bombPass") player.bombPass = true;
   else if (type === "blockPass") player.blockPass = true;
   else if (type === "suit") player.invincibleUntilTick = state.tick + SUIT_SECONDS * TICK_RATE;
-  else if (type === "fullFire") player.fireRange = Math.max(...Object.values(gridDimensions(state.grid)));
+  else if (type === "fullFire") {
+    const { width, height } = gridDimensions(state.grid);
+    player.fireRange = Math.floor(Math.min(width, height) / 3);
+    player.fullFire = true;
+  }
 }
 
 function collectPowerups(state, player) {
@@ -455,6 +557,7 @@ function advanceFallingBlocks(state) {
 export function dropDeathBlock(state, x, y) {
   if (state.status !== "playing" || ![EMPTY, CRATE].includes(tileAt(state.grid, x, y))) return false;
   if (state.fallingBlocks.some((block) => block.x === x && block.y === y)) return false;
+  if (!state.suddenDeathActive) permanentlyEliminateEdgePlayers(state);
   state.suddenDeathActive = true;
   state.fallingBlocks.push({ x, y, ttl: DEATH_BLOCK_FALL_SECONDS, duration: DEATH_BLOCK_FALL_SECONDS });
   return true;
@@ -514,11 +617,11 @@ export function step(state, inputs = {}) {
   applyBlastDamage(state);
 
   for (const player of state.players) {
-    if (!player.alive) continue;
+    if (!player.alive && !player.edgeActive) continue;
     const input = inputs[player.id] || {};
     movePlayer(state, player, input);
     if (input.intent) input.intent = null;
-    collectPowerups(state, player);
+    if (player.alive) collectPowerups(state, player);
     if (input.drop && !player.dropLatch) placeBomb(state, player);
     if (input.detonate && !player.detonateLatch) remoteDetonate(state, player);
     if (input.special && !player.specialLatch) throwBomb(state, player);
