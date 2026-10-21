@@ -1,4 +1,5 @@
 import { characterFor } from "./identity.js";
+import { mountMapStudio, closeMapEditor, showMapError } from './components/map-picker.js';
 // ============================================================
 // IMPORTAÇÕES
 // ============================================================
@@ -431,6 +432,7 @@ function stopRenderLoop() {
  * Renderiza a tela inicial do Raivolt.
  */
 function renderLanding({ forceIntro = false } = {}) {
+  closeMapEditor();
   setMenuMusicActive(true);
 
   stopVictory();
@@ -685,6 +687,7 @@ function startLatencyMonitoring() {
  * Processa todas as mensagens recebidas pelo WebSocket.
  */
 function handleMessage(message) {
+  if (message.type === 'mapError') { showMapError(message.key); return; }
   // Jogador entrou na sala.
   if (message.type === "joined") {
     player = message;
@@ -1015,6 +1018,7 @@ function renderLobby(lobby) {
     : `<img src="/player-avatar-${slot.slot + 1}.png" alt="${escapeHtml(slot.name)}" />`).join("");
   root.innerHTML = `<main class="lobby-shell ${firstLobbyRender ? "lobby-entering" : ""} ${gameMode === GAME_MODES.SUPER ? "super-lobby" : ""} ${modeChanged ? `mode-switching ${switchDirection}` : ""}"><div class="lobby-backdrop" aria-hidden="true"><i></i><i></i><i></i></div><nav class="lobby-nav">${brand()}${settingsMenu()}<div class="room-chip"><i></i><span>${text("lobby.active")}</span><b>${escapeHtml(player.roomCode)}</b></div></nav><section class="lobby-heading"><div class="lobby-heading-copy"><div class="eyebrow"><span>●</span> ${text("lobby.waitingRoom")}</div><h2>${text("lobby.build")}<br><strong>${text("lobby.squad")}</strong></h2><p>${isHost ? text("lobby.hostDescription") : text("lobby.guestDescription")}</p></div><aside class="lobby-squad-card"><span>${text("lobby.currentTeam")}</span><b>${onlineCount}<small>/${capacity}</small></b><em>${text("lobby.onlinePlayers")}</em><div class="squad-preview">${squadPreview}</div></aside></section><section class="lobby-grid"><div class="players-panel"><div class="panel-title"><span><i></i> ${text("lobby.roster")}</span><b>${text("lobby.onlineCount", { count: onlineCount, capacity })}</b></div><div class="slot-list">${lobby.slots.map((slot) => slotMarkup(slot, lobby.hostId)).join("")}</div></div><aside class="invite-panel"><div class="invite-panel-heading"><div><span>${text("lobby.invite")}</span><b>${text("lobby.callTeam")}</b></div><i aria-hidden="true">✦</i></div><label>${text("lobby.link")}</label><div class="copy-row"><input readonly value="${escapeHtml(roomUrl)}" ${attr("aria-label", "lobby.roomLink")} /><button id="copy-link" ${attr("aria-label", "lobby.copyLabel")}>${text("lobby.copy")}</button></div><div class="room-pass" ${attr("aria-label", "common.roomCodeValue", { code: player.roomCode })}><div class="pass-pixels" aria-hidden="true"></div><span><small>${text("common.roomCodeLabel")}</small><strong>${escapeHtml(player.roomCode)}</strong><em>${text("lobby.characters")}</em></span></div><p>${text("lobby.linkHelp", { capacity })}</p>${botDifficultyPanel}${botControlPanel}</aside></section><section class="lobby-actions"><div class="lobby-action-copy"><span>${text("lobby.status")}</span><b>${ownSlot?.ready ? text("lobby.youReady") : text("lobby.confirm")}</b></div><button class="ready-button ${ownSlot?.ready ? "active" : ""}" id="ready-button">${ownSlot?.ready ? text("lobby.ready") : text("lobby.imReady")}</button>${isHost ? `<button class="primary start-button" id="start-button"><span><small>${text("common.host")}</small>${text("lobby.start")}</span><b>▶</b></button>` : `<div class="host-wait"><i></i> ${text("common.waitHost")}</div>`}</section></main>`;
   root.querySelector(".lobby-grid")?.insertAdjacentHTML("beforebegin", modePanel);
+  mountMapStudio(root, lobby, isHost, send);
   if (!canUseClassic) {
     root.querySelector(".mode-panel")?.insertAdjacentHTML("beforeend", `<p class="mode-capacity-hint">${text("mode.classicFull")}</p>`);
   }
@@ -1056,6 +1060,7 @@ function slotMarkup(slot, hostId) {
  * canvas, countdown, áudio e controles.
  */
 function renderMatch(start) {
+  closeMapEditor();
   setMenuMusicActive(false);
   stopVictory();
   stopMenuMascot();
@@ -1298,6 +1303,7 @@ function renderResult(winnerSlot, standings = [], reason = "elimination") {
  * Renderiza erros retornados pelo servidor.
  */
 function renderError(message) {
+  closeMapEditor();
   const knownErrors = { ROOM_FULL: "error.fullTitle", ROOM_NOT_FOUND: "error.notFoundTitle", MATCH_IN_PROGRESS: "error.inProgressTitle" };
   const knownError = Object.hasOwn(knownErrors, message.code);
   const errorTitle = knownError ? knownErrors[message.code] : "error.genericTitle";

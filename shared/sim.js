@@ -24,6 +24,7 @@ import {
   WALL,
 } from "./constants.js";
 import { ARENA_TYPES, arenaDimensions, gridDimensions, arenaTypeForPlayerCount, isArenaBoundary, isInsideArena, spawnsForArena } from "./arena.js";
+import { STANDARD_MAPS, presetMap, validateCustomMap } from './maps.js';
 
 const POWERUP_WEIGHTS = [
   ["fire", 22], ["bomb", 20], ["speed", 19], ["remote", 8], ["glove", 7],
@@ -114,14 +115,31 @@ export function createPlayer({ id, slot, name, kind = "human" }, arenaType = ARE
   };
 }
 
-export function createMatch(seed, slots, { mode = GAME_MODES.CLASSIC } = {}) {
-  const arenaType = arenaTypeForPlayerCount(slots.length);
+export function createMatch(seed, slots, { mode = GAME_MODES.CLASSIC, mapId = 'original', customMap = null } = {}) {
+  // Resolve once per match on the server; snapshots carry the concrete map.
+  // A separate seeded stream preserves the original arena's crate generation.
+  if (mode === GAME_MODES.SUPER && mapId === 'random') {
+    const random = seededRandom((Number(seed) || 1) ^ 0x5ad0cafe);
+    mapId = STANDARD_MAPS[Math.floor(random() * STANDARD_MAPS.length)].id;
+  }
+  const usesCustom = mode === GAME_MODES.SUPER && mapId === 'custom';
+  const arenaType = usesCustom ? ARENA_TYPES.RECTANGLE : arenaTypeForPlayerCount(slots.length);
+  let selected = null;
+  if (usesCustom) {
+    const result = validateCustomMap(customMap);
+    if (result.error) throw new Error(result.error);
+    selected = result.map;
+  } else if (mode === GAME_MODES.SUPER && mapId !== 'original') selected = presetMap(mapId, arenaType);
   return {
     tick: 0,
     seed,
     mode,
     arenaType,
-    grid: createGrid(seed, { arenaType }),
+    mapId: selected?.id || 'original',
+    mapName: selected?.name || '',
+    mapTheme: selected?.theme || 'reactor',
+    blockColors: selected?.colors || '',
+    grid: selected?.grid || createGrid(seed, { arenaType }),
     players: slots.map((slot) => createPlayer(slot, arenaType)),
     bombs: [],
     blasts: [],
@@ -527,6 +545,10 @@ export function snapshot(state) {
     tick: state.tick,
     mode: state.mode,
     arenaType: state.arenaType,
+    mapId: state.mapId,
+    mapName: state.mapName,
+    mapTheme: state.mapTheme,
+    blockColors: state.blockColors,
     grid: state.grid,
     players: state.players.map(({ dropLatch, detonateLatch, specialLatch, invincibleUntilTick, queuedDirection, queuedDirectionUntilTick, ...player }) => ({
       ...player,
