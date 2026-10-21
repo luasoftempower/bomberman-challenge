@@ -1,3 +1,8 @@
+import {
+  initializeAudioPreferenceSync,
+  subscribeAudioMuted,
+} from "./audio-preference.js";
+
 const menuTheme = new Audio("/sounds/menu.mp3");
 const superMenuTheme = new Audio("/sounds/menu-overdrive.mp3");
 const hoverSound = new Audio("/sounds/scrollmouse.mp3");
@@ -11,6 +16,22 @@ const walkingSound = new Audio("/sounds/walking.wav");
 const bombExplosionSound = new Audio("/sounds/bombexploding.wav");
 const winSound = new Audio("/sounds/winsound.mp3");
 const drawSound = new Audio("/sounds/drawgame.mp3");
+
+const audioChannels = [
+  menuTheme,
+  superMenuTheme,
+  hoverSound,
+  clickSound,
+  luaSoftSound,
+  countdownSound,
+  battleTheme,
+  superBattleTheme,
+  deathSound,
+  walkingSound,
+  bombExplosionSound,
+  winSound,
+  drawSound,
+];
 
 menuTheme.loop = true;
 menuTheme.preload = "auto";
@@ -43,6 +64,13 @@ winSound.preload = "auto";
 winSound.volume = 0.5;
 drawSound.preload = "auto";
 drawSound.volume = 0.58;
+
+// O mute é aplicado no próprio elemento de áudio. Assim músicas que já estavam
+// tocando continuam sincronizadas em silêncio e voltam instantaneamente quando
+// o jogador reativa o som, sem reiniciar a faixa ou escapar algum efeito.
+subscribeAudioMuted((muted) => {
+  for (const audio of audioChannels) audio.muted = muted;
+});
 
 let menuMusicActive = false;
 let menuMusicMode = "classic";
@@ -141,6 +169,7 @@ export function playLuaSoftSound() {
 }
 
 export function initializeAudio() {
+  initializeAudioPreferenceSync();
   const unlock = () => {
     audioUnlocked = true;
     if (menuMusicActive) play(activeMenuTheme());

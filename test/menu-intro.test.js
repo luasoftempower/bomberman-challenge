@@ -86,4 +86,6 @@ test("skip removes the intro immediately, reveals the menu and remembers the cho
 test("replay control is only included when a screen opts into it", () => {
   assert.doesNotMatch(settingsMenu(), /data-replay-intro/);
   assert.match(settingsMenu({ showReplayIntro: true }), /data-replay-intro/);
+  assert.match(settingsMenu(), /data-audio-toggle/);
+  assert.match(settingsMenu(), /aria-pressed="false"/);
 });

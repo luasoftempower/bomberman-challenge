@@ -1,6 +1,12 @@
 // O módulo de idiomas cuida dos textos, da bandeira e da troca PT/EN.
 // Este arquivo cuida da apresentação dos controles e do estado aberto/fechado.
-import { attr, languageButton, text } from "./i18n/index.js";
+import { attr, languageButton, t, text } from "./i18n/index.js";
+import {
+  initializeAudioPreferenceSync,
+  isAudioMuted,
+  subscribeAudioMuted,
+  toggleAudioMuted,
+} from "./audio-preference.js";
 
 export const REPLAY_INTRO_EVENT = "raivolt:replay-intro";
 
@@ -23,12 +29,27 @@ function replayIntroButton() {
   ><span aria-hidden="true">↻</span>${text("settings.replayIntro")}</button>`;
 }
 
+function audioToggleButton() {
+  const muted = isAudioMuted();
+  const textKey = muted ? "settings.audioMuted" : "settings.audioOn";
+  const labelKey = muted ? "settings.audioUnmuteLabel" : "settings.audioMuteLabel";
+  return `<button
+    class="settings-menu-item audio-toggle"
+    data-audio-toggle
+    type="button"
+    aria-pressed="${muted}"
+    ${attr("aria-label", labelKey)}
+    ${attr("title", labelKey)}
+  ><span class="audio-toggle-icon" aria-hidden="true">${muted ? "🔇" : "🔊"}</span><span class="audio-toggle-copy">${text(textKey)}</span></button>`;
+}
+
 export function settingsMenu({ showReplayIntro = false } = {}) {
   const panelId = `settings-panel-${++menuId}`;
   const replayButton = showReplayIntro ? replayIntroButton() : "";
   return `<div class="settings-menu" data-settings-menu>
     <div class="settings-desktop">
       ${replayButton}
+      ${audioToggleButton()}
       ${languageButton()}
     </div>
     <div class="settings-mobile">
@@ -54,10 +75,29 @@ export function settingsMenu({ showReplayIntro = false } = {}) {
         inert
       >
         ${replayButton}
+        ${audioToggleButton()}
         ${languageButton()}
       </div>
     </div>
   </div>`;
+}
+
+function updateAudioButtons(muted) {
+  const textKey = muted ? "settings.audioMuted" : "settings.audioOn";
+  const labelKey = muted ? "settings.audioUnmuteLabel" : "settings.audioMuteLabel";
+  for (const button of document.querySelectorAll("[data-audio-toggle]")) {
+    button.setAttribute("aria-pressed", String(muted));
+    button.setAttribute("aria-label", t(labelKey));
+    button.setAttribute("data-i18n-aria-label", labelKey);
+    button.setAttribute("data-i18n-aria-label-params", "{}");
+    button.title = t(labelKey);
+    button.setAttribute("data-i18n-title", labelKey);
+    button.setAttribute("data-i18n-title-params", "{}");
+    const icon = button.querySelector(".audio-toggle-icon");
+    if (icon) icon.textContent = muted ? "🔇" : "🔊";
+    const copy = button.querySelector(".audio-toggle-copy");
+    if (copy) copy.innerHTML = text(textKey);
+  }
 }
 
 function setMenuOpen(menu, open) {
@@ -79,6 +119,8 @@ function closeMenus(except = null) {
 }
 
 export function initializeSettingsMenu() {
+  initializeAudioPreferenceSync();
+  subscribeAudioMuted(updateAudioButtons);
   // Deve ser inicializada uma vez, na entrada do main.js, sem repetir por tela.
   // O limite precisa acompanhar a media query de settings-menu.css.
   const mobile = window.matchMedia("(max-width: 680px)");
@@ -102,6 +144,11 @@ export function initializeSettingsMenu() {
     // closest encontra o menu mesmo quando o clique vem da bandeira ou de uma linha.
     const menu = event.target.closest("[data-settings-menu]");
     closeMenus(menu);
+    if (event.target.closest("[data-audio-toggle]")) {
+      event.preventDefault();
+      toggleAudioMuted();
+      return;
+    }
     if (event.target.closest("[data-replay-intro]")) {
       event.preventDefault();
       setMenuOpen(menu, false);
