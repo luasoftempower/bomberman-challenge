@@ -107,11 +107,12 @@ test("an edge player can place a bomb from a straight perimeter tile into the ar
   edgePlayer.x = 1.5 * TILE_SIZE;
   edgePlayer.y = 0.5 * TILE_SIZE;
   target.x = 1.5 * TILE_SIZE;
-  target.y = 1.5 * TILE_SIZE;
+  target.y = 2.5 * TILE_SIZE;
 
   step(state, { [edgePlayer.id]: { drop: true } });
   assert.equal(state.bombs.length, 1);
   assert.equal(state.bombs[0].ownerId, edgePlayer.id);
+  assert.deepEqual([state.bombs[0].x, state.bombs[0].y], [1, 1]);
 
   forceDetonate(state, [state.bombs[0].id]);
   assert.equal(target.alive, false);

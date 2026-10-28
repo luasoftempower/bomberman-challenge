@@ -284,13 +284,23 @@ function movePlayer(state, player, input) {
 }
 
 function placeBomb(state, player) {
-  const x = Math.floor(player.x / TILE_SIZE);
-  const y = Math.floor(player.y / TILE_SIZE);
+  let x = Math.floor(player.x / TILE_SIZE);
+  let y = Math.floor(player.y / TILE_SIZE);
+  if (player.edgeActive) {
+    const { width, height } = gridDimensions(state.grid);
+    if (x === 0) x = 1;
+    else if (x === width - 1) x = width - 2;
+    else if (y === 0) y = 1;
+    else if (y === height - 1) y = height - 2;
+    // A bomba da borda entra na arena; não deve continuar no quadrado externo
+    // nem aparecer sobre um bloco, outra bomba ou um jogador.
+    if (!canBombEnter(state, x, y)) return;
+  }
   const owned = state.bombs.filter((bomb) => bomb.ownerId === player.id).length;
   if (owned >= player.maxBombs || state.bombs.some((bomb) => bomb.x === x && bomb.y === y)) return;
   state.bombs.push({
     id: state.nextBombId++, ownerId: player.id, x, y, fuse: player.remote ? 99 : FUSE_SECONDS,
-    range: player.fireRange, remote: player.remote, placedTick: state.tick, passThroughIds: [player.id],
+    range: player.fireRange, remote: player.remote, placedTick: state.tick, passThroughIds: player.edgeActive ? [] : [player.id],
   });
 }
 
