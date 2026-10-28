@@ -263,23 +263,31 @@ function movePlayer(state, player, input) {
   }
   if (player.queuedDirectionUntilTick < state.tick) player.queuedDirection = null;
 
-  if (!player.moveTarget) {
-    const queued = player.queuedDirection;
-    if (queued && startPlayerMove(state, player, queued)) player.queuedDirection = null;
-    if (!player.moveTarget && !startPlayerMove(state, player, cardinalDirection(input))) return;
-  }
+  let remaining = (player.moveSpeed || MOVE_SPEED) * TICK_SECONDS;
+  let segments = 0;
+  while (remaining > 0.001 && segments < 2) {
+    if (!player.moveTarget) {
+      const queued = player.queuedDirection;
+      if (queued && startPlayerMove(state, player, queued)) player.queuedDirection = null;
+      if (!player.moveTarget && !startPlayerMove(state, player, cardinalDirection(input))) break;
+    }
 
-  const dx = player.moveTarget.x - player.x;
-  const dy = player.moveTarget.y - player.y;
-  const distance = Math.abs(dx) + Math.abs(dy);
-  const travel = Math.min((player.moveSpeed || MOVE_SPEED) * TICK_SECONDS, distance);
-  if (dx) player.x += Math.sign(dx) * travel;
-  else if (dy) player.y += Math.sign(dy) * travel;
+    const dx = player.moveTarget.x - player.x;
+    const dy = player.moveTarget.y - player.y;
+    const distance = Math.abs(dx) + Math.abs(dy);
+    const travel = Math.min(remaining, distance);
+    if (dx) player.x += Math.sign(dx) * travel;
+    else if (dy) player.y += Math.sign(dy) * travel;
+    remaining -= travel;
 
-  if (travel >= distance - 0.001) {
-    player.x = player.moveTarget.x;
-    player.y = player.moveTarget.y;
-    player.moveTarget = null;
+    if (travel >= distance - 0.001) {
+      player.x = player.moveTarget.x;
+      player.y = player.moveTarget.y;
+      player.moveTarget = null;
+      segments += 1;
+    } else {
+      break;
+    }
   }
 }
 
@@ -301,16 +309,22 @@ function remoteDetonate(state, player) {
 }
 
 function throwBomb(state, player) {
-  if (!player.glove) return;
+  if (state.mode !== GAME_MODES.SUPER || !player.glove) return;
   const direction = facingDirection(player);
   const playerX = Math.floor(player.x / TILE_SIZE);
   const playerY = Math.floor(player.y / TILE_SIZE);
   const bomb = bombAt(state, playerX + direction.x, playerY + direction.y);
   if (!bomb) return;
-  for (let distance = 3; distance >= 1; distance -= 1) {
+  const throwDistance = 3;
+  for (let distance = 1; distance <= throwDistance; distance += 1) {
     const targetX = bomb.x + direction.x * distance;
     const targetY = bomb.y + direction.y * distance;
-    if (!canBombEnter(state, targetX, targetY, bomb.id)) continue;
+    const tile = tileAt(state.grid, targetX, targetY);
+    // A Luva passa por cima de caixas e percorre três casas mesmo sem
+    // obstáculos. Paredes, limites, bombas e jogadores interrompem o trajeto.
+    if (tile === CRATE) continue;
+    if (tile !== EMPTY || !canBombEnter(state, targetX, targetY, bomb.id)) return;
+    if (distance < throwDistance) continue;
     bomb.throwFromX = bomb.x;
     bomb.throwFromY = bomb.y;
     bomb.x = targetX;
@@ -508,8 +522,8 @@ function applyPowerup(state, player, type) {
   else if (type === "bomb") player.maxBombs = Math.min(MAX_BOMBS_LIMIT, player.maxBombs + 1);
   else if (type === "speed") player.moveSpeed = Math.min(MAX_MOVE_SPEED, player.moveSpeed + SPEED_UP_AMOUNT);
   else if (type === "remote") player.remote = true;
-  else if (type === "glove") player.glove = true;
-  else if (type === "kick") player.kick = true;
+  else if (type === "glove") { player.glove = true; player.kick = false; }
+  else if (type === "kick") { player.kick = true; player.glove = false; }
   else if (type === "bombPass") player.bombPass = true;
   else if (type === "blockPass") player.blockPass = true;
   else if (type === "suit") player.invincibleUntilTick = state.tick + SUIT_SECONDS * TICK_RATE;

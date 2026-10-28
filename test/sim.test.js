@@ -455,7 +455,7 @@ test("the ten RAIVOLT Overdrive powerups apply their stats and abilities", () =>
   assert.equal(player.fireRange, MAX_FIRE_RANGE);
   assert.equal(player.maxBombs, 3);
   assert.equal(player.moveSpeed, MOVE_SPEED + SPEED_UP_AMOUNT);
-  assert.equal(player.remote && player.glove && player.kick && player.bombPass && player.blockPass, true);
+  assert.equal(player.remote && !player.glove && player.kick && player.bombPass && player.blockPass, true);
   assert.equal(snapshot(state).players[0].protected, true);
   assert.equal(state.powerups.length, 0);
 });
@@ -474,8 +474,84 @@ test("remote control bombs wait and detonate on command", () => {
   assert.equal(state.bombs.some((candidate) => candidate.id === remoteBomb.id), false);
 });
 
-test("the glove throws an adjacent bomb over obstacles", () => {
-  const state = baseState();
+test("glove and kick replace each other when collected", () => {
+  const state = superState();
+  const player = state.players[0];
+  const x = Math.floor(player.x / TILE_SIZE);
+  const y = Math.floor(player.y / TILE_SIZE);
+
+  state.powerups = [{ id: 1, type: "glove", x, y }];
+  step(state, {});
+  assert.equal(player.glove, true);
+  assert.equal(player.kick, false);
+
+  state.powerups = [{ id: 2, type: "kick", x, y }];
+  step(state, {});
+  assert.equal(player.glove, false);
+  assert.equal(player.kick, true);
+
+  state.powerups = [{ id: 3, type: "glove", x, y }];
+  step(state, {});
+  assert.equal(player.glove, true);
+  assert.equal(player.kick, false);
+});
+
+test("the Super glove throws three tiles even when one crate is in the way", () => {
+  const state = superState();
+  const player = state.players[0];
+  player.glove = true;
+  player.facing = "right";
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+  const grid = state.grid.split("");
+  grid[indexOf(5, 3)] = CRATE;
+  state.grid = grid.join("");
+  state.bombs = [bomb(1, 4, 3)];
+
+  step(state, { p1: { special: true } });
+
+  assert.equal(state.bombs[0].x, 7);
+  assert.equal(state.bombs[0].y, 3);
+  assert(state.bombs[0].airborneTtl > 0);
+});
+
+test("the Super glove throws three tiles when the path is clear", () => {
+  const state = superState();
+  const player = state.players[0];
+  player.glove = true;
+  player.facing = "right";
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+  state.bombs = [bomb(1, 4, 3)];
+
+  step(state, { p1: { special: true } });
+
+  assert.equal(state.bombs[0].x, 7);
+  assert.equal(state.bombs[0].airborneTtl > 0, true);
+});
+
+test("the Super glove crosses adjacent crates and lands on the first empty tile", () => {
+  const state = superState();
+  const player = state.players[0];
+  player.glove = true;
+  player.facing = "right";
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+  const grid = state.grid.split("");
+  grid[indexOf(5, 3)] = CRATE;
+  grid[indexOf(6, 3)] = CRATE;
+  state.grid = grid.join("");
+  state.bombs = [bomb(1, 4, 3)];
+
+  step(state, { p1: { special: true } });
+
+  assert.equal(state.bombs[0].x, 7);
+  assert.equal(state.bombs[0].y, 3);
+  assert(state.bombs[0].airborneTtl > 0);
+});
+
+test("the Super glove cannot throw through a wall or land on an occupied tile", () => {
+  const state = superState();
   const player = state.players[0];
   player.glove = true;
   player.facing = "right";
@@ -488,9 +564,32 @@ test("the glove throws an adjacent bomb over obstacles", () => {
 
   step(state, { p1: { special: true } });
 
-  assert.equal(state.bombs[0].x, 7);
-  assert.equal(state.bombs[0].y, 3);
-  assert(state.bombs[0].airborneTtl > 0);
+  assert.equal(state.bombs[0].x, 4);
+  assert.equal(state.bombs[0].airborneTtl, undefined);
+
+  grid[indexOf(5, 3)] = CRATE;
+  state.grid = grid.join("");
+  state.players[1].x = 6.5 * TILE_SIZE;
+  state.players[1].y = 3.5 * TILE_SIZE;
+  player.specialLatch = false;
+  step(state, { p1: { special: true } });
+  assert.equal(state.bombs[0].x, 4);
+  assert.equal(state.bombs[0].airborneTtl, undefined);
+});
+
+test("the glove cannot throw bombs in classic mode", () => {
+  const state = baseState();
+  const player = state.players[0];
+  player.glove = true;
+  player.facing = "right";
+  player.x = 3.5 * TILE_SIZE;
+  player.y = 3.5 * TILE_SIZE;
+  state.bombs = [bomb(1, 4, 3)];
+
+  step(state, { p1: { special: true } });
+
+  assert.equal(state.bombs[0].x, 4);
+  assert.equal(state.bombs[0].airborneTtl, undefined);
 });
 
 test("kick slides bombs while bomb pass and block pass open their tiles", () => {
