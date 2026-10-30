@@ -39,6 +39,22 @@ test("room codes use six unambiguous characters", () => {
   }
 });
 
+test("players can change their lobby name and the updated name is broadcast", () => {
+  const room = new Room("ABC234", "host-secret");
+  const socket = new FakeSocket();
+  const joined = room.addHuman(socket, { name: "Host", hostToken: "host-secret" });
+
+  room.updatePlayerName(joined.id, "  LuaPlayer  ");
+
+  assert.equal(room.slots.find((slot) => slot.id === joined.id).name, "LuaPlayer");
+  assert.equal(socket.messages.at(-1).slots[0].name, "LuaPlayer");
+  room.updatePlayerName(joined.id, "X".repeat(30));
+  assert.equal(room.slots.find((slot) => slot.id === joined.id).name, "X".repeat(16));
+  room.phase = "playing";
+  room.updatePlayerName(joined.id, "TooLate");
+  assert.equal(room.slots.find((slot) => slot.id === joined.id).name, "X".repeat(16));
+});
+
 
 // ============================================================
 // LIMITE DE JOGADORES

@@ -140,6 +140,10 @@ webSockets.on("connection", (socket) => {
       room.updateInput(playerId, message);
     }
 
+    else if (message.type === "playerName") {
+      room.updatePlayerName(playerId, message.name);
+    }
+
     else if (message.type === "ready") {
       room.setReady(playerId, message.ready);
     }

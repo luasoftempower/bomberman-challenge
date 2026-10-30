@@ -1,4 +1,4 @@
-import { MAX_FIRE_RANGE, POWERUP_TYPES } from "../shared/constants.js";
+import { POWERUP_TYPES } from "../shared/constants.js";
 
 // Esta lista é a fonte única dos poderes exibidos no menu e durante a partida.
 // Ao criar um novo poder, adicione-o primeiro em shared/constants.js e depois
@@ -13,7 +13,7 @@ export const POWERUPS = Object.freeze([
   { type: "bombPass", nameKey: "ability.bombPass", descriptionKey: "ability.bombPassDescription", usageKey: "ability.bombPassUse", playerField: "bombPass", hudBadge: "BP" },
   { type: "blockPass", nameKey: "ability.blockPass", descriptionKey: "ability.blockPassDescription", usageKey: "ability.blockPassUse", playerField: "blockPass", hudBadge: "CP" },
   { type: "suit", nameKey: "ability.suit", descriptionKey: "ability.suitDescription", usageKey: "ability.suitUse", playerField: "protected", hudBadge: "S", hudClass: "suit" },
-  { type: "fullFire", nameKey: "ability.fullFire", descriptionKey: "ability.fullFireDescription", usageKey: "ability.collectUse", statField: "fireRange", minimum: MAX_FIRE_RANGE, hudBadge: "MAX", hudClass: "full-fire" },
+  { type: "fullFire", nameKey: "ability.fullFire", descriptionKey: "ability.fullFireDescription", usageKey: "ability.collectUse", playerField: "fullFire", hudBadge: "MAX", hudClass: "full-fire" },
 ]);
 
 // Falha cedo em desenvolvimento se a simulação ganhar/perder um poder sem que

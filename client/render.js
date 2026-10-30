@@ -275,7 +275,7 @@ function drawKnockedOutPlayer(context, player, palette) {
 }
 
 function drawPlayer(context, player, palette, animationTime) {
-  if (!player.alive) {
+  if (!player.alive && !player.edgeActive) {
     drawKnockedOutPlayer(context, player, palette);
     return;
   }
@@ -297,6 +297,13 @@ function drawPlayer(context, player, palette, animationTime) {
   px(context, "rgba(0,0,0,.42)", x - 13, y + 12, 26, 5);
 
   drawCyborg(context, x, y, palette, motion);
+  if (player.edgeActive) {
+    context.strokeStyle = "#55dff7";
+    context.lineWidth = 2;
+    context.globalAlpha = 0.85;
+    context.strokeRect(x - 15, y - 17, 30, 30);
+    context.globalAlpha = 1;
+  }
 
   context.fillStyle = "#f7f3ff";
   context.font = "700 8px Silkscreen, monospace";
