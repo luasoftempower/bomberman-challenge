@@ -12,21 +12,23 @@ const sheets = Array.from({ length: 8 }, (_, slot) => {
 
 export function spriteFrame({direction='down',frame=0,moving=false,mood='idle'}={}) {
   const row=mood==='winner'?3:direction==='up'?2:(direction==='left'||direction==='right')?1:0;
-  const column=moving?Math.floor(((frame%8)+8)%8/2):0;
+  const gait=[0,1,2,3,2,1];
+  const phase=Math.floor(((frame%12)+12)%12/2);
+  const column=moving?gait[phase]:0;
   return { source: ATLAS.frames[row*4+column], mirror: direction==='left', row, column };
 }
 
 // Keep one scale across all frames. Crops remove transparent gutters, not artwork.
 // All frames share a foot anchor so differing source margins never cause skating.
 export function drawAtlasFrame(context,image,x,y,options={}) {
-  const {source,mirror}=spriteFrame(options);
+  const frame=spriteFrame(options);
+  const {source,mirror}=frame;
   const [sx,sy,sw,sh]=source;
   const scale=46/ATLAS.bodyHeight;
-  const bob=options.moving && Math.floor(options.frame||0)%2 ? -1 : 0;
   context.save();
   context.imageSmoothingEnabled=false;
   
-  context.translate(Math.round(x),Math.round(y)+18+bob);
+  context.translate(Math.round(x),Math.round(y)+18);
   if(mirror)context.scale(-1,1);
   if(options.mood==='crying')context.translate(0,1);
   context.drawImage(image,sx,sy,sw,sh,-Math.round(sw*scale/2),-Math.round(sh*scale),Math.round(sw*scale),Math.round(sh*scale));

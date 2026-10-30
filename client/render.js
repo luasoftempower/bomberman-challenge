@@ -219,7 +219,7 @@ function drawBomb(context, bomb, animationTime) {
     const progress = 1 - bomb.airborneTtl / (bomb.throwDuration || 0.42);
     bombX = bomb.throwFromX + (bomb.x - bomb.throwFromX) * progress;
     bombY = bomb.throwFromY + (bomb.y - bomb.throwFromY) * progress;
-    arc = Math.sin(progress * Math.PI) * 30;
+    arc = Math.sin(progress * Math.PI) * TILE_SIZE * 3;
   } else if (bomb.slideVisualTtl > 0 && Number.isFinite(bomb.slideFromX)) {
     const progress = 1 - bomb.slideVisualTtl / 0.12;
     bombX = bomb.slideFromX + (bomb.x - bomb.slideFromX) * progress;
@@ -260,10 +260,12 @@ function motionFor(player, animationTime) {
  let direction=previous?.direction||'down';
  if(distance>.02)direction=Math.abs(dx)>=Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up');
  const lastMoved=distance>.02?animationTime:(previous?.lastMoved??-Infinity);
- const moving=animationTime-lastMoved<.085;
- const travel=(previous?.travel||0)+(distance<TILE_SIZE?distance:0);
- const frame=moving?Math.floor(travel/6)%8:0;
- spriteMotion.set(player.id,{x:player.x,y:player.y,direction,travel,lastMoved});
+ const moving=animationTime-lastMoved<.12;
+ const walkStartedAt=moving?(previous?.moving?previous.walkStartedAt:animationTime):0;
+ // Cycle all four full-body poses, then reverse through them so arms and legs
+ // swing together without abruptly snapping back to the first pose.
+ const frame=moving?Math.floor((animationTime-walkStartedAt)*25)%12:0;
+ spriteMotion.set(player.id,{x:player.x,y:player.y,direction,lastMoved,moving,walkStartedAt});
  return {direction,moving,frame};
 }
 
