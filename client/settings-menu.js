@@ -123,9 +123,9 @@ export function initializeSettingsMenu() {
   subscribeAudioMuted(updateAudioButtons);
   // Deve ser inicializada uma vez, na entrada do main.js, sem repetir por tela.
   // O limite precisa acompanhar a media query de settings-menu.css.
-  const mobile = window.matchMedia("(max-width: 680px)");
+  const mobile = window.matchMedia("(max-width: 980px)");
   mobile.addEventListener("change", () => {
-    // change ocorre ao cruzar o limite de 680px, não a cada pixel redimensionado.
+    // change ocorre ao cruzar o limite de 980px, não a cada pixel redimensionado.
     // Guarda o menu focado antes de fechar os painéis, pois o foco pode se perder
     // quando o controle anterior fica oculto ou o painel passa a ser inert.
     const focusedMenu = document.activeElement?.closest("[data-settings-menu]");

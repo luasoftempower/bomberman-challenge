@@ -1111,3 +1111,347 @@ body { background:#090e20; }
 .mode-card strong { overflow-wrap:anywhere; }
 @media(max-width:600px) { .battle-logo > strong { font-size:10vw; } .menu-header .brand { width:190px; } }
 @media(prefers-reduced-motion:reduce) { .battle-logo { animation:none; } }
+
+/* ST-03 — escala de leitura e contraste acessível.
+   Textos funcionais partem de 12px; metadados compactos do HUD usam 10–11px
+   apenas quando o espaço da arena é limitado. A identidade pixel art permanece
+   nos títulos, enquanto textos auxiliares ganham altura de linha e contraste. */
+:root {
+  --font-readable-min: 12px;
+  --font-readable-meta: 11px;
+  --text-muted-readable: #bdb5ca;
+  --text-subtle-readable: #a59daf;
+  --muted: var(--text-muted-readable);
+}
+
+:where(button, input, summary, a):focus-visible {
+  outline: 3px solid var(--lime);
+  outline-offset: 3px;
+}
+
+/* Menu e introdução */
+.profile-copy small,
+.menu-kicker,
+.arcade-action small,
+.join-room-action > label,
+.how-to-play-action small,
+.arena-rank small,
+.player-count small,
+.menu-footer,
+.intro-skip,
+.intro-loader span,
+.intro-start small,
+.intro-story-kicker,
+.intro-story p,
+.intro-studio span {
+  font-size: var(--font-readable-min);
+  line-height: 1.45;
+}
+
+.profile-copy small,
+.how-to-play-action small,
+.arena-rank small,
+.player-count small,
+.menu-footer,
+.intro-skip,
+.intro-loader span,
+.intro-studio span {
+  color: var(--text-muted-readable);
+}
+
+.intro-loader em {
+  color: var(--text-subtle-readable);
+  font-size: var(--font-readable-meta);
+}
+
+.intro-skip {
+  min-height: 44px;
+  opacity: 1;
+}
+
+.battle-logo > em {
+  font-size: clamp(11px,1.3vw,13px);
+  line-height: 1.3;
+}
+
+/* Telas de transição */
+.transition-kicker,
+.transition-tip,
+.match-loading-content span,
+.match-loading-content b {
+  font-size: var(--font-readable-min);
+  line-height: 1.45;
+}
+
+.transition-copy span,
+.transition-tip {
+  color: var(--text-muted-readable);
+}
+
+/* Lobby: labels, regras, estados e ajudas continuam legíveis sem zoom. */
+.room-chip,
+.lobby-player-name > span,
+.lobby-squad-card > span,
+.lobby-squad-card > em,
+.mode-panel header span,
+.mode-card small,
+.panel-title,
+.slot-number,
+.player-slot small,
+.player-slot em,
+.invite-panel-heading span,
+.copy-row input,
+.copy-row button,
+.room-pass small,
+.room-pass em,
+.lobby-action-copy span,
+.ready-button,
+.host-wait,
+.bot-difficulty-panel header span,
+.bot-difficulty-panel header b,
+.bot-difficulty-options button span,
+.bot-control-panel header span,
+.bot-control-panel header b,
+.bot-control-buttons button,
+.bot-control-panel > p,
+.mode-capacity-hint {
+  font-size: var(--font-readable-min);
+  line-height: 1.45;
+}
+
+.room-chip b,
+.mode-card strong,
+.player-slot b,
+.invite-panel-heading b,
+.lobby-action-copy b,
+.start-button > span {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lobby-player-name small,
+.mode-panel header small,
+.mode-card em,
+.invite-panel > p,
+.bot-difficulty-options button small,
+.bot-difficulty-panel > p {
+  color: var(--text-muted-readable);
+  font-size: var(--font-readable-meta);
+  line-height: 1.55;
+}
+
+.player-slot small,
+.player-slot em,
+.mode-card small,
+.panel-title,
+.invite-panel-heading span,
+.copy-row input,
+.room-pass small,
+.room-pass em,
+.lobby-action-copy span,
+.host-wait {
+  color: var(--text-subtle-readable);
+}
+
+.player-slot mark,
+.mode-card > b,
+.start-button small {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.mode-card,
+.bot-difficulty-options button {
+  min-height: 96px;
+}
+
+.bot-difficulty-options button {
+  grid-template-columns: 30px minmax(0,1fr);
+}
+
+.bot-difficulty-options button small {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.bot-control-buttons button {
+  min-height: 48px;
+}
+
+/* HUD e partida: nomes/estados em 11–12px; números compactos nunca abaixo de 10px. */
+.match-label,
+.match-timer small,
+.hud-player b,
+.hud-player small,
+.hud-player em,
+.controls-card > span,
+.controls-card p,
+kbd,
+.sidebar-powerups summary,
+.match-intro-kicker,
+.countdown-stage > span,
+.countdown-stage > em {
+  font-size: var(--font-readable-meta);
+  line-height: 1.4;
+}
+
+.hud-player b,
+.power-legend summary {
+  font-size: var(--font-readable-min);
+}
+
+.match-label b,
+.match-timer small,
+.hud-player small,
+.controls-card > span,
+.controls-card p,
+.sidebar-powerups summary,
+.countdown-stage > span {
+  color: var(--text-muted-readable);
+}
+
+.hud-stats i,
+.hud-abilities i,
+.sidebar-powerups li,
+.match-intro-roster b {
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.bomb-button,
+.power-buttons button {
+  font-size: var(--font-readable-meta);
+  line-height: 1.25;
+}
+
+.hud-stats,
+.hud-abilities {
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.hud-stats i,
+.hud-abilities i {
+  min-height: 20px;
+  padding: 3px 5px;
+}
+
+/* Resultados e mensagens de retorno */
+.battle-result-header > span,
+.battle-result-header p,
+.battle-player-copy small,
+.battle-trophy-total small,
+.battle-result-actions button small,
+.winner-celebration > span,
+.winner-celebration p,
+.draw-kicker,
+.draw-clock small,
+.draw-contenders b,
+.draw-content p,
+.error-code,
+.toast {
+  font-size: var(--font-readable-meta);
+  line-height: 1.45;
+}
+
+.battle-result-header p,
+.battle-player-copy small,
+.battle-trophy-total small,
+.winner-celebration p,
+.draw-clock small,
+.draw-content p {
+  color: var(--text-muted-readable);
+}
+
+@media (max-width: 620px) {
+  .menu-footer {
+    font-size: var(--font-readable-meta);
+  }
+
+  .menu-header {
+    gap: 10px;
+  }
+
+  .player-profile {
+    min-width: 148px;
+  }
+
+  .profile-copy small {
+    font-size: 10px;
+    letter-spacing: .08em;
+  }
+
+  .profile-copy input {
+    width: min(30vw,120px);
+  }
+
+  .menu-footer {
+    flex-wrap: wrap;
+    justify-content: center;
+    line-height: 1.6;
+  }
+
+  .transition-tip {
+    bottom: 24px;
+    max-width: calc(100vw - 32px);
+    font-size: var(--font-readable-meta);
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .mode-card {
+    grid-template-columns: 44px minmax(0,1fr);
+  }
+
+  .mode-card > b {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .player-slot {
+    grid-template-columns: 28px 38px minmax(0,1fr);
+    row-gap: 7px;
+  }
+
+  .player-slot em,
+  .slot-trophies {
+    grid-column: 3;
+    justify-self: start;
+    margin-top: 0;
+  }
+
+  .lobby-actions button {
+    min-width: min(100%,170px);
+  }
+}
+
+@media (max-width: 420px) {
+  .menu-header .brand {
+    width: 132px;
+  }
+
+  .profile-avatar {
+    display: none;
+  }
+
+  .player-profile {
+    min-width: 132px;
+  }
+
+  .lobby-nav {
+    align-items: flex-start;
+    gap: 9px;
+  }
+
+  .lobby-nav .brand {
+    width: 132px;
+  }
+
+  .room-chip {
+    max-width: 150px;
+  }
+
+  .battle-result-actions {
+    grid-template-columns: 1fr;
+  }
+}
