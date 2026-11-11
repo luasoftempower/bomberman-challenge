@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">ST-16: closing block cadence doubled</title>
+  <desc id="desc">Comparison of closing block drops during the 45-second sudden death: previously every 500 milliseconds, now every 250 milliseconds.</desc>
+  <defs>
+    <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#10232f"/><stop offset="1" stop-color="#09151d"/></linearGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#29404b" stroke-width="1"/></pattern>
+    <linearGradient id="block" x2="0" y2="1"><stop stop-color="#dcff78"/><stop offset="1" stop-color="#82b843"/></linearGradient>
+  </defs>
+  <rect width="1200" height="620" rx="28" fill="url(#bg)"/>
+  <text x="64" y="76" fill="#dfff96" font-family="Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="3">RAIVOLT · ST-16</text>
+  <text x="64" y="124" fill="#f0f7f8" font-family="Arial,sans-serif" font-size="38" font-weight="700">Closing blocks fall twice as often</text>
+  <text x="64" y="166" fill="#9db1b9" font-family="Arial,sans-serif" font-size="20">Sudden Death still starts with 45 seconds left in Overdrive.</text>
+  <g font-family="Arial,sans-serif">
+    <rect x="64" y="204" width="1072" height="156" rx="18" fill="#172c38" stroke="#2b4652"/>
+    <text x="92" y="245" fill="#f0f7f8" font-size="22" font-weight="700">Before</text>
+    <text x="92" y="281" fill="#9db1b9" font-size="18">1 block every 500 ms</text>
+    <rect x="370" y="226" width="710" height="86" rx="10" fill="url(#grid)" stroke="#38515b"/>
+    <path d="M382 337H1068" stroke="#67818a" stroke-width="2"/>
+    <path d="M382 332v10M1068 332v10" stroke="#67818a" stroke-width="2"/>
+    <text x="716" y="351" fill="#9db1b9" font-size="16" text-anchor="middle">45 seconds · up to 90 scheduled drops</text>
+    <g fill="url(#block)">
+      <rect x="390" y="244" width="14" height="14" rx="2"/><rect x="445" y="244" width="14" height="14" rx="2"/><rect x="500" y="244" width="14" height="14" rx="2"/><rect x="555" y="244" width="14" height="14" rx="2"/><rect x="610" y="244" width="14" height="14" rx="2"/><rect x="665" y="244" width="14" height="14" rx="2"/><rect x="720" y="244" width="14" height="14" rx="2"/><rect x="775" y="244" width="14" height="14" rx="2"/><rect x="830" y="244" width="14" height="14" rx="2"/><rect x="885" y="244" width="14" height="14" rx="2"/><rect x="940" y="244" width="14" height="14" rx="2"/><rect x="995" y="244" width="14" height="14" rx="2"/>
+    </g>
+    <rect x="64" y="382" width="1072" height="156" rx="18" fill="#172c38" stroke="#b1db5a" stroke-width="2"/>
+    <text x="92" y="423" fill="#f0f7f8" font-size="22" font-weight="700">After</text>
+    <text x="92" y="459" fill="#dfff96" font-size="18">1 block every 250 ms</text>
+    <rect x="370" y="404" width="710" height="86" rx="10" fill="url(#grid)" stroke="#38515b"/>
+    <path d="M382 515H1068" stroke="#67818a" stroke-width="2"/>
+    <path d="M382 510v10M1068 510v10" stroke="#67818a" stroke-width="2"/>
+    <text x="716" y="529" fill="#9db1b9" font-size="16" text-anchor="middle">45 seconds · up to 180 scheduled drops</text>
+    <g fill="url(#block)">
+      <rect x="386" y="418" width="10" height="10" rx="2"/><rect x="409" y="418" width="10" height="10" rx="2"/><rect x="432" y="418" width="10" height="10" rx="2"/><rect x="455" y="418" width="10" height="10" rx="2"/><rect x="478" y="418" width="10" height="10" rx="2"/><rect x="501" y="418" width="10" height="10" rx="2"/><rect x="524" y="418" width="10" height="10" rx="2"/><rect x="547" y="418" width="10" height="10" rx="2"/><rect x="570" y="418" width="10" height="10" rx="2"/><rect x="593" y="418" width="10" height="10" rx="2"/><rect x="616" y="418" width="10" height="10" rx="2"/><rect x="639" y="418" width="10" height="10" rx="2"/><rect x="662" y="418" width="10" height="10" rx="2"/><rect x="685" y="418" width="10" height="10" rx="2"/><rect x="708" y="418" width="10" height="10" rx="2"/><rect x="731" y="418" width="10" height="10" rx="2"/><rect x="754" y="418" width="10" height="10" rx="2"/><rect x="777" y="418" width="10" height="10" rx="2"/><rect x="800" y="418" width="10" height="10" rx="2"/><rect x="823" y="418" width="10" height="10" rx="2"/><rect x="846" y="418" width="10" height="10" rx="2"/><rect x="869" y="418" width="10" height="10" rx="2"/><rect x="892" y="418" width="10" height="10" rx="2"/><rect x="915" y="418" width="10" height="10" rx="2"/><rect x="938" y="418" width="10" height="10" rx="2"/><rect x="961" y="418" width="10" height="10" rx="2"/><rect x="984" y="418" width="10" height="10" rx="2"/><rect x="1007" y="418" width="10" height="10" rx="2"/><rect x="1030" y="418" width="10" height="10" rx="2"/><rect x="1053" y="418" width="10" height="10" rx="2"/>
+    </g>
+  </g>
+</svg>
