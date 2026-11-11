@@ -67,7 +67,7 @@ const DIRECTION_VECTORS = {
 export const MATCH_DURATION_MS = 90_000;
 export const SUPER_MATCH_DURATION_MS = 180_000;
 export const SUDDEN_DEATH_REMAINING_MS = 45_000;
-export const DEATH_BLOCK_INTERVAL_MS = 500;
+export const DEATH_BLOCK_INTERVAL_MS = 250;
 
 // ============================================================
 // CONFIGURAÇÕES DOS BOTS
