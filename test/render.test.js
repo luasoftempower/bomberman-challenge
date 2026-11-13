@@ -45,6 +45,23 @@ test('presentation renders movement, protection, defeat and bomb trajectories wi
  }
  assert.ok(canvas.count()>0);
 });
+test('solid obstacles are composited in front of tall players while names remain readable', () => {
+ const events=[];
+ const mainContext=new Proxy({}, {get(target,key){return key in target?target[key]:(...args)=>{
+   events.push(key);for(const value of args)if(typeof value==='number')assert.ok(Number.isFinite(value));
+ };}});
+ const auxiliaryContext=new Proxy({}, {get(target,key){return key in target?target[key]:()=>{};}});
+ const canvas={width:520,height:440,getContext:()=>mainContext};
+ canvas.ownerDocument={createElement:()=>({width:0,height:0,getContext:()=>auxiliaryContext})};
+ const state=snapshot(createMatch(19,[{id:'p0',slot:0,name:'P0'},{id:'p1',slot:1,name:'P1'}]));
+
+ renderGame(canvas,state);
+
+ const layerDraws=events.map((name,index)=>name==='drawImage'?index:-1).filter(index=>index>=0);
+ assert.equal(layerDraws.length,2,'arena base and obstacle foreground should each be composited once');
+ assert.ok(events.slice(layerDraws[0]+1,layerDraws[1]).includes('fillRect'),'player body should be drawn between both layers');
+ assert.ok(events.slice(layerDraws[1]+1).includes('fillText'),'player name should stay above the obstacle foreground');
+});
 test('menu and result animation loops render and cancel for every character', (t) => {
  let callback; let id=0; const cancelled=[];
  globalThis.requestAnimationFrame=()=>{}; globalThis.cancelAnimationFrame=()=>{};

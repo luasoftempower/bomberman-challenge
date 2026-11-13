@@ -8,6 +8,7 @@ import { BLAST_SECONDS, CRATE, EMPTY, PLAYER_COLORS, TILE_SIZE, VOID, WALL } fro
 // pode liberar automaticamente o contexto e o cache associados a ele.
 const gameContexts = new WeakMap();
 const staticArenaLayers = new WeakMap();
+const staticObstacleLayers = new WeakMap();
 // Reutilizado entre quadros para não criar Set e strings intermediárias com
 // map() durante cada desenho da arena.
 const liveDischargeKeys = new Set();
@@ -91,6 +92,42 @@ function staticArenaLayer(canvas, grid, arenaType, columns, rows, width, height,
   }
 
   staticArenaLayers.set(canvas, { key, width, height, canvas: layer });
+  return layer;
+}
+
+/**
+ * Paredes e caixas formam uma camada frontal transparente. Os personagens são
+ * altos e ultrapassam alguns pixels da própria casa; redesenhar apenas os
+ * obstáculos depois deles preserva a profundidade e evita que pareçam entrar
+ * numa parede. A camada é cacheada pela mesma chave da arena estática.
+ */
+function staticObstacleLayer(canvas, grid, arenaType, columns, rows, width, height, state) {
+  const themed = state.mapId && state.mapId !== 'original';
+  const key = `${arenaType}:${isArenaArtReady()}:${grid}:${state.mapTheme}:${state.blockColors}`;
+  const cached = staticObstacleLayers.get(canvas);
+  if (cached?.key === key && cached.width === width && cached.height === height) return cached.canvas;
+
+  const layer = canvas.ownerDocument.createElement('canvas');
+  layer.width = width;
+  layer.height = height;
+  const context = layer.getContext('2d', { alpha: true });
+  context.imageSmoothingEnabled = false;
+  context.clearRect(0, 0, width, height);
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      const tile = grid[y * columns + x];
+      if (tile !== WALL && tile !== CRATE) continue;
+      const left = x * TILE_SIZE;
+      const top = y * TILE_SIZE;
+      if (themed) drawEnergyTile(context, tile, left, top, state.mapTheme, state.blockColors?.[y * columns + x]);
+      else {
+        drawFloor(context, left, top, x, y);
+        if (tile === WALL) drawWall(context, left, top, isArenaBoundary(arenaType, x, y));
+        else drawCrate(context, left, top);
+      }
+    }
+  }
+  staticObstacleLayers.set(canvas, { key, width, height, canvas: layer });
   return layer;
 }
 
@@ -313,6 +350,16 @@ function drawKnockedOutPlayer(context, player, palette) {
  drawCyborg(context,0,0,palette,{mood:'crying'}); context.restore();
 }
 
+function drawPlayerName(context, player) {
+  context.fillStyle = '#f7f3ff';
+  context.font = '700 8px Silkscreen, monospace';
+  context.textAlign = 'center';
+  context.textBaseline = 'bottom';
+  context.shadowColor = '#05070d';
+  context.shadowBlur = 0;
+  context.fillText(player.name, Math.round(player.x), Math.round(player.y) - 29);
+}
+
 function drawPlayer(context, player, palette, animationTime) {
   if (!player.alive && !player.edgeActive) {
     drawKnockedOutPlayer(context, player, palette);
@@ -344,13 +391,6 @@ function drawPlayer(context, player, palette, animationTime) {
     context.globalAlpha = 1;
   }
 
-  context.fillStyle = "#f7f3ff";
-  context.font = "700 8px Silkscreen, monospace";
-  context.textAlign = "center";
-  context.textBaseline = "bottom";
-  context.shadowColor = "#05070d";
-  context.shadowBlur = 0;
-  context.fillText(player.name, x, y - 29);
 }
 
 function drawVictoryMascot(context, palette, elapsed) {
@@ -478,7 +518,19 @@ export function renderGame(canvas, state) {
   for (const { x, y } of state.blasts || []) liveDischargeKeys.add(`${x},${y}`);
   for (const blast of state.blasts || []) drawBlast(context, blast, animationTime, liveDischargeKeys);
   for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
-  for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
+  const players = state.players || [];
+  for (const player of players) {
+    if (!player.edgeActive) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
+  }
+  context.drawImage(staticObstacleLayer(canvas, grid, state.arenaType, columns, rows, width, height, state), 0, 0);
+  // Eliminados no modo Super percorrem a própria borda da arena e precisam
+  // permanecer visíveis sobre a parede externa que representa essa pista.
+  for (const player of players) {
+    if (player.edgeActive) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
+  }
   for (const burst of state.portalBursts || []) drawPortalBurst(context, burst);
   for (const block of state.fallingBlocks || []) drawFallingBlock(context, block, animationTime);
+  for (const player of players) {
+    if (player.alive || player.edgeActive) drawPlayerName(context, player);
+  }
 }
