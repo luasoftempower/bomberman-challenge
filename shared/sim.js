@@ -31,6 +31,7 @@ const POWERUP_WEIGHTS = [
   ["kick", 8], ["bombPass", 5], ["blockPass", 4], ["suit", 5], ["fullFire", 2],
 ];
 const TURN_BUFFER_TICKS = Math.ceil(TICK_RATE * 0.5);
+const PORTAL_BURST_SECONDS = 0.45;
 
 export function seededRandom(seed) {
   let value = (Number(seed) || 1) >>> 0;
@@ -103,6 +104,8 @@ export function createPlayer({ id, slot, name, kind = "human" }, arenaType = ARE
     moveTarget: null,
     queuedDirection: null,
     queuedDirectionUntilTick: 0,
+    portalLockKey: null,
+    portalSequence: 0,
     facing: slot === 0 || slot === 3 ? "right" : "left",
     maxBombs: MAX_BOMBS,
     fireRange: BLAST_RANGE,
@@ -141,11 +144,13 @@ export function createMatch(seed, slots, { mode = GAME_MODES.CLASSIC, mapId = 'o
     mapName: selected?.name || '',
     mapTheme: selected?.theme || 'reactor',
     blockColors: selected?.colors || '',
+    portals: selected?.portals || [],
     grid: selected?.grid || createGrid(seed, { arenaType }),
     players: slots.map((slot) => createPlayer(slot, arenaType)),
     bombs: [],
     blasts: [],
     powerups: [],
+    portalBursts: [],
     fallingBlocks: [],
     suddenDeathActive: false,
     status: "playing",
@@ -167,6 +172,43 @@ function playerOccupies(state, x, y, ignoredPlayerId = null) {
     const currentY = Math.floor(player.y / TILE_SIZE);
     return (currentX === x && currentY === y) || (player.moveTarget?.tileX === x && player.moveTarget?.tileY === y);
   });
+}
+
+function portalAt(state, x, y) {
+  return state.portals?.find((portal) => portal.x === x && portal.y === y) || null;
+}
+
+function portalDestinationSafe(state, player, portal) {
+  const { targetX: x, targetY: y } = portal;
+  return tileAt(state.grid, x, y) === EMPTY
+    && !bombAt(state, x, y)
+    && !playerOccupies(state, x, y, player.id)
+    && !state.blasts.some((blast) => blast.x === x && blast.y === y)
+    && !state.fallingBlocks.some((block) => block.x === x && block.y === y);
+}
+
+function tryTeleportPlayer(state, player) {
+  if (!player.alive || player.edgeActive || !state.portals?.length) return false;
+  const tileX = Math.floor(player.x / TILE_SIZE);
+  const tileY = Math.floor(player.y / TILE_SIZE);
+  const currentKey = `${tileX},${tileY}`;
+  if (player.portalLockKey) {
+    if (player.portalLockKey === currentKey) return false;
+    player.portalLockKey = null;
+  }
+  const portal = portalAt(state, tileX, tileY);
+  if (!portal || !portalDestinationSafe(state, player, portal)) return false;
+  player.x = (portal.targetX + 0.5) * TILE_SIZE;
+  player.y = (portal.targetY + 0.5) * TILE_SIZE;
+  player.moveTarget = null;
+  player.queuedDirection = null;
+  player.portalLockKey = `${portal.targetX},${portal.targetY}`;
+  player.portalSequence = (player.portalSequence || 0) + 1;
+  state.portalBursts.push(
+    { x: portal.x, y: portal.y, color: portal.color, ttl: PORTAL_BURST_SECONDS },
+    { x: portal.targetX, y: portal.targetY, color: portal.color, ttl: PORTAL_BURST_SECONDS },
+  );
+  return true;
 }
 
 function canBombEnter(state, x, y, ignoredBombId = null) {
@@ -636,6 +678,7 @@ export function step(state, inputs = {}) {
   if (state.status !== "playing") return state;
   state.tick += 1;
   state.blasts = state.blasts.map((blast) => ({ ...blast, ttl: blast.ttl - TICK_SECONDS })).filter((blast) => blast.ttl > 0);
+  state.portalBursts = (state.portalBursts || []).map((burst) => ({ ...burst, ttl: burst.ttl - TICK_SECONDS })).filter((burst) => burst.ttl > 0);
   advanceFallingBlocks(state);
   advanceBombMotion(state);
   applyBlastDamage(state);
@@ -644,6 +687,7 @@ export function step(state, inputs = {}) {
     if (!player.alive && !player.edgeActive) continue;
     const input = inputs[player.id] || {};
     movePlayer(state, player, input);
+    tryTeleportPlayer(state, player);
     if (input.intent) input.intent = null;
     if (player.alive) collectPowerups(state, player);
     if (input.drop && !player.dropLatch) placeBomb(state, player);
@@ -676,8 +720,9 @@ export function snapshot(state) {
     mapName: state.mapName,
     mapTheme: state.mapTheme,
     blockColors: state.blockColors,
+    portals: state.portals,
     grid: state.grid,
-    players: state.players.map(({ dropLatch, detonateLatch, specialLatch, invincibleUntilTick, queuedDirection, queuedDirectionUntilTick, ...player }) => ({
+    players: state.players.map(({ dropLatch, detonateLatch, specialLatch, invincibleUntilTick, queuedDirection, queuedDirectionUntilTick, portalLockKey, ...player }) => ({
       ...player,
       protected: invincibleUntilTick > state.tick,
       protectionRemaining: Math.max(0, (invincibleUntilTick - state.tick) * TICK_SECONDS),
@@ -685,6 +730,7 @@ export function snapshot(state) {
     bombs: state.bombs.map(({ passThroughIds, ...bomb }) => bomb),
     blasts: state.blasts,
     powerups: state.powerups,
+    portalBursts: state.portalBursts,
     fallingBlocks: state.fallingBlocks,
     suddenDeathActive: state.suddenDeathActive,
   };

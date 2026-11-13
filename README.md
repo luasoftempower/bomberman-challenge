@@ -33,6 +33,7 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 - 💥 **Dez Power-ups:** Alcance elétrico, Carga, Patins, Controle Remoto, Luva, Chute, Passagem de Carga, Passagem de Bloco, Colete e Alta Tensão.
 - ⏭️ **Introdução flexível:** Pule a apresentação imediatamente ou reveja-a pelo menu principal.
 - ⚡ **Movimento responsivo:** Predição, reconciliação e renderização revisadas para reduzir travamentos sem abrir mão do servidor autoritativo.
+- 🌀 **Portais de terreno:** Arenas especiais do modo Overdrive conectam áreas distantes com teleporte seguro e sinalização por cor e letra.
 
 ---
 
@@ -187,6 +188,16 @@ da página ao sair do lobby para a partida.
 Consulte o [README visual da ST-18](docs/evidencias/st-18/README.md) para ver os
 prints, a explicação técnica, os testes automatizados e o roteiro de validação
 manual.
+
+## 🌀 Portais em terrenos específicos (ST-10)
+
+Algumas arenas do modo **Overdrive** agora possuem pares de portais. Ao entrar
+em um deles, o jogador é levado ao outro ponto de mesma letra e cor. O servidor
+autoriza o teleporte somente quando o destino está livre de jogadores, bombas,
+descargas, blocos em queda e paredes.
+
+Veja a [documentação dos portais](docs/PORTAIS.md) para conferir os terrenos
+habilitados, as regras de segurança e a cobertura de testes.
 
 ## 📈 Estado Atual e Contribuições
 

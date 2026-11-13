@@ -107,6 +107,20 @@
   letter-spacing:1px;
   color:#adc1c7
 }
+.map-portal-badge {
+  position:absolute;
+  left:13px;
+  bottom:8px;
+  padding:2px 5px;
+  border:1px solid color-mix(in srgb,var(--map-accent) 72%,transparent);
+  border-radius:3px;
+  background:#08141dde;
+  color:var(--map-accent);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.7px;
+  line-height:1.2
+}
 .map-selected {
   position:absolute;
   top:17px;

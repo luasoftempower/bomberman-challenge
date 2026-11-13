@@ -381,8 +381,15 @@ function startRenderLoop() {
 
         // Outros jogadores.
         else {
-          current.x += (target.x - current.x) * smoothing;
-          current.y += (target.y - current.y) * smoothing;
+          const teleported = (target.portalSequence || 0) !== (current.portalSequence || 0);
+          if (teleported) {
+            current.x = target.x;
+            current.y = target.y;
+            current.moveTarget = target.moveTarget ? { ...target.moveTarget } : null;
+          } else {
+            current.x += (target.x - current.x) * smoothing;
+            current.y += (target.y - current.y) * smoothing;
+          }
 
           const displayX = current.x;
           const displayY = current.y;

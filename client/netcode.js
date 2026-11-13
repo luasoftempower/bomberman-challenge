@@ -255,6 +255,15 @@ function correctAlongOneAxis(current, target, maximumTravel, useTargetRoute = fa
 }
 
 export function reconcileLocalPlayer(current, target, state, input, elapsedMs, predictionMs) {
+  // A portal is an intentional discontinuity. Interpolating this correction
+  // would drag the player through walls and make the teleport look like lag.
+  if ((target.portalSequence || 0) !== (current.portalSequence || 0)) {
+    return {
+      ...target,
+      moveTarget: target.moveTarget ? { ...target.moveTarget } : null,
+      predictedDirectionSequence: current.predictedDirectionSequence || 0,
+    };
+  }
   if (target.alive === false) {
     return {
       ...target,

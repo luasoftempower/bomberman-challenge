@@ -1,5 +1,5 @@
 import { CRATE, EMPTY, WALL } from './constants.js';
-import { ARENA_TYPES, arenaDimensions, spawnsForArena } from './arena.js';
+import { ARENA_TYPES, arenaDimensions, gridDimensions, spawnsForArena } from './arena.js';
 
 export const MAP_THEMES = Object.freeze({
   reactor: { color: '#55dff7', floor: '#162a38', wall: '#50697c', glow: '#b8f6ff' },
@@ -32,6 +32,68 @@ export const STANDARD_MAPS = Object.freeze([
   })),
 ]);
 
+// Portals are contextual terrain metadata rather than a new grid tile. Keeping
+// them outside the grid means walls, crates and custom maps retain the ST-09
+// schema, while only the presets listed here opt into teleportation.
+const PORTAL_TERRAINS = Object.freeze({
+  'circuit-6': Object.freeze([{ pairId: 'A', from: 'northwest', to: 'southeast', color: '#55dff7' }]),
+  'plasma-4': Object.freeze([{ pairId: 'A', from: 'northeast', to: 'southwest', color: '#b295ff' }]),
+  'station-5': Object.freeze([
+    { pairId: 'A', from: 'northwest', to: 'southeast', color: '#55dff7' },
+    { pairId: 'B', from: 'northeast', to: 'southwest', color: '#ff77b5' },
+  ]),
+});
+
+function portalAnchor(name, width, height) {
+  const anchors = {
+    northwest: { x: 3, y: 3 },
+    northeast: { x: width - 4, y: 3 },
+    southwest: { x: 3, y: height - 4 },
+    southeast: { x: width - 4, y: height - 4 },
+  };
+  return anchors[name];
+}
+
+export function portalsForMap(mapId, arenaType = ARENA_TYPES.RECTANGLE) {
+  const definitions = PORTAL_TERRAINS[mapId] || [];
+  const { width, height } = arenaDimensions(arenaType);
+  return definitions.flatMap(({ pairId, from, to, color }) => {
+    const first = portalAnchor(from, width, height);
+    const second = portalAnchor(to, width, height);
+    return [
+      { id: `${mapId}:${pairId}:1`, pairId, label: pairId, color, x: first.x, y: first.y, targetX: second.x, targetY: second.y },
+      { id: `${mapId}:${pairId}:2`, pairId, label: pairId, color, x: second.x, y: second.y, targetX: first.x, targetY: first.y },
+    ];
+  });
+}
+
+export function validatePortalLayout(portals, grid) {
+  if (!Array.isArray(portals) || typeof grid !== 'string') return false;
+  if (!portals.length) return true;
+  const { width, height } = gridDimensions(grid);
+  const positions = new Map();
+  for (const portal of portals) {
+    if (!portal || typeof portal.id !== 'string' || typeof portal.pairId !== 'string'
+      || !Number.isInteger(portal.x) || !Number.isInteger(portal.y)
+      || !Number.isInteger(portal.targetX) || !Number.isInteger(portal.targetY)
+      || portal.x <= 0 || portal.y <= 0 || portal.x >= width - 1 || portal.y >= height - 1
+      || portal.targetX <= 0 || portal.targetY <= 0 || portal.targetX >= width - 1 || portal.targetY >= height - 1
+      || (portal.x === portal.targetX && portal.y === portal.targetY)
+      || grid[portal.y * width + portal.x] !== EMPTY) return false;
+    const key = `${portal.x},${portal.y}`;
+    if (positions.has(key)) return false;
+    positions.set(key, portal);
+  }
+  const pairs = new Map();
+  for (const portal of portals) {
+    if (!pairs.has(portal.pairId)) pairs.set(portal.pairId, []);
+    pairs.get(portal.pairId).push(portal);
+  }
+  return [...pairs.values()].every((pair) => pair.length === 2
+    && pair[0].targetX === pair[1].x && pair[0].targetY === pair[1].y
+    && pair[1].targetX === pair[0].x && pair[1].targetY === pair[0].y);
+}
+
 // Layouts translate the reference's rings, split corridors, dense lattices,
 // winding paths, terraces and open checker fields into energy modules.
 // Destructible cover makes the patterns navigable after bombs clear a path.
@@ -53,6 +115,8 @@ function referenceCover(variant, x, y, familyIndex) {
 function referenceMap(preset, arenaType) {
   const { width, height } = arenaDimensions(arenaType);
   const safe = protectedMapCells(arenaType);
+  const portals = portalsForMap(preset.id, arenaType);
+  const portalCells = new Set(portals.map(({ x, y }) => y * width + x));
   const familyIndex = MAP_FAMILIES.findIndex((family) => family.id === preset.family);
   const baseColor = { plasma: 4, circuit: 1, furnace: 2, garden: 3, temple: 2, station: 1 }[preset.family];
   const cells = [], colors = [];
@@ -65,7 +129,7 @@ function referenceMap(preset, arenaType) {
         && !(preset.family === 'garden' && (x + y) % 6 === 0)
         && !(preset.family === 'furnace' && x % 6 === 0)
         && !(preset.family === 'station' && (x + y) % 8 === 0);
-      cells.push(border ? WALL : safe.has(y * width + x) ? EMPTY : pillar ? WALL
+      cells.push(border ? WALL : safe.has(y * width + x) || portalCells.has(y * width + x) ? EMPTY : pillar ? WALL
         : referenceCover(preset.variant, sx, sy, familyIndex) ? CRATE : EMPTY);
       const color = preset.family === 'plasma' ? [0, 1, 2, 4][(x + y + preset.variant) % 4]
         : preset.family === 'temple' && (x + y) % 5 === 0 ? 0
@@ -73,7 +137,9 @@ function referenceMap(preset, arenaType) {
       colors.push(String(color));
     }
   }
-  return { id: preset.id, name: '', theme: preset.theme, grid: cells.join(''), colors: colors.join('') };
+  const map = { id: preset.id, name: '', theme: preset.theme, grid: cells.join(''), colors: colors.join(''), portals };
+  if (!validatePortalLayout(portals, map.grid)) throw new Error(`Invalid portals for map ${preset.id}`);
+  return map;
 }
 
 // Spawns and two adjacent escape tiles are protected in every preset/editor.

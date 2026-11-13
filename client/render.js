@@ -2,7 +2,7 @@ import { drawArenaProp, isArenaArtReady } from "./arena-art.js";
 import { drawEnergyTile } from './map-art.js';
 import { CHARACTERS, drawCyborg, drawCharge } from "./identity.js";
 import { arenaDimensions, isArenaBoundary } from "../shared/arena.js";
-import { BLAST_SECONDS, CRATE, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
+import { BLAST_SECONDS, CRATE, EMPTY, PLAYER_COLORS, TILE_SIZE, VOID, WALL } from "../shared/constants.js";
 
 // Os mapas são fracos (WeakMap): quando a tela remove um canvas, o navegador
 // pode liberar automaticamente o contexto e o cache associados a ele.
@@ -100,6 +100,43 @@ const POWERUP_COLORS = {
   bombPass: ["#7774a8", "#8ff4ff"], blockPass: ["#b76b3e", "#f2b35e"], suit: ["#55dff7", "#ecffff"],
   fullFire: ["#7859d0", "#b5faff"],
 };
+
+function drawPortal(context, portal, animationTime) {
+  const left = portal.x * TILE_SIZE;
+  const top = portal.y * TILE_SIZE;
+  const pulse = Math.floor(animationTime * 7 + portal.x + portal.y) % 2;
+  const color = portal.color || '#55dff7';
+  px(context, 'rgba(0,0,0,.46)', left + 5, top + 31, 30, 5);
+  px(context, '#070b18', left + 4, top + 4, 32, 30);
+  px(context, pulse ? color : '#34285a', left + 6, top + 6, 28, 26);
+  px(context, '#0a1020', left + 10, top + 9, 20, 20);
+  px(context, color, left + 4, top + 4, 7, 3);
+  px(context, color, left + 29, top + 4, 7, 3);
+  px(context, color, left + 4, top + 31, 7, 3);
+  px(context, color, left + 29, top + 31, 7, 3);
+  context.save();
+  context.fillStyle = pulse ? '#ffffff' : color;
+  context.font = '700 9px Silkscreen, monospace';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.shadowColor = color;
+  context.shadowBlur = 6;
+  context.fillText(portal.label || 'A', left + 20, top + 19);
+  context.restore();
+}
+
+function drawPortalBurst(context, burst) {
+  const progress = Math.max(0, Math.min(1, 1 - burst.ttl / 0.45));
+  const size = 18 + progress * 26;
+  const centerX = (burst.x + 0.5) * TILE_SIZE;
+  const centerY = (burst.y + 0.5) * TILE_SIZE;
+  context.save();
+  context.globalAlpha = 1 - progress;
+  context.strokeStyle = burst.color || '#55dff7';
+  context.lineWidth = progress < 0.5 ? 4 : 2;
+  context.strokeRect(centerX - size / 2, centerY - size / 2, size, size);
+  context.restore();
+}
 
 function drawPowerup(context, powerup, animationTime) {
   const left = powerup.x * TILE_SIZE;
@@ -433,11 +470,15 @@ export function renderGame(canvas, state) {
     0,
     0,
   );
+  for (const portal of state.portals || []) {
+    if (grid[portal.y * columns + portal.x] === EMPTY) drawPortal(context, portal, animationTime);
+  }
   for (const powerup of state.powerups || []) drawPowerup(context, powerup, animationTime);
   liveDischargeKeys.clear();
   for (const { x, y } of state.blasts || []) liveDischargeKeys.add(`${x},${y}`);
   for (const blast of state.blasts || []) drawBlast(context, blast, animationTime, liveDischargeKeys);
   for (const bomb of state.bombs || []) drawBomb(context, bomb, animationTime);
   for (const player of state.players || []) drawPlayer(context, player, CHARACTER_PALETTES[player.slot] || CHARACTER_PALETTES[0], animationTime);
+  for (const burst of state.portalBursts || []) drawPortalBurst(context, burst);
   for (const block of state.fallingBlocks || []) drawFallingBlock(context, block, animationTime);
 }

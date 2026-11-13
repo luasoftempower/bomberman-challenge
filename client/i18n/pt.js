@@ -52,6 +52,8 @@ export default {
   "maps.guestHelp": "O dono da sala escolhe o mapa. Todos jogam na mesma arena.",
   "maps.create": "Criar mapa",
   "maps.six": "ATÉ 6 JOGADORES",
+  "maps.portals": "PORTAIS",
+  "maps.portalHint": "Este terreno possui portais conectados por letra e cor.",
   "maps.selected": "SELECIONADO",
   "maps.customDetail": "Arena personalizada · seis pontos de partida.",
   "maps.library": "SEUS MAPAS",

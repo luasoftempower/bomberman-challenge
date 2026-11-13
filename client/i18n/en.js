@@ -52,6 +52,8 @@ export default {
   "maps.guestHelp": "The room host chooses the map. Everyone plays in the same arena.",
   "maps.create": "Create map",
   "maps.six": "UP TO 6 PLAYERS",
+  "maps.portals": "PORTALS",
+  "maps.portalHint": "This terrain has portals linked by matching letters and colors.",
   "maps.selected": "SELECTED",
   "maps.customDetail": "Custom arena · six starting positions.",
   "maps.library": "YOUR MAPS",
