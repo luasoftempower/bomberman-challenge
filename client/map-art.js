@@ -45,6 +45,14 @@ export function paintMapPreview(canvas, map, showSpawns = true) {
       drawArenaProp(ctx, map.grid[i] === WALL ? 'wall' : 'crate', x + 1, y + 1, size - 2, size - 2);
     }
   }
+  for (const portal of map.portals || []) {
+    const left = portal.x * size, top = portal.y * size;
+    ctx.fillStyle = '#060b16'; ctx.fillRect(left + 2, top + 2, 12, 12);
+    ctx.fillStyle = portal.color || '#55dff7'; ctx.fillRect(left + 3, top + 3, 10, 2);
+    ctx.fillRect(left + 3, top + 11, 10, 2); ctx.fillRect(left + 3, top + 5, 2, 6); ctx.fillRect(left + 11, top + 5, 2, 6);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(portal.label || 'A', left + 8, top + 8);
+  }
   if (showSpawns) {
     ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const [slot, spawn] of spawnsForArena(width === 23 ? ARENA_TYPES.RECTANGLE : ARENA_TYPES.SQUARE).entries()) {

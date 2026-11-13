@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { reconcileLocalPlayer } from "../client/netcode.js";
+import { interpolateRemotePlayer, reconcileLocalPlayer } from "../client/netcode.js";
 import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY, WALL } from "../shared/constants.js";
 
 function stateWith(player) {
@@ -10,6 +10,45 @@ function stateWith(player) {
     players: [player],
   };
 }
+
+test("remote interpolation follows a corner one axis at a time", () => {
+  const target = {
+    id: "remote",
+    x: 140,
+    y: 80,
+    facing: "down",
+    moveTarget: { x: 140, y: 100, tileX: 3, tileY: 2 },
+  };
+  let current = { ...target, x: 100, y: 60, moveTarget: { x: 140, y: 60, tileX: 3, tileY: 1 } };
+  let reachedSecondSegment = false;
+
+  for (let frame = 0; frame < 30; frame += 1) {
+    const previous = current;
+    const result = interpolateRemotePlayer(current, target, 0.45);
+    const movedX = Math.abs(result.x - previous.x) > 0.001;
+    const movedY = Math.abs(result.y - previous.y) > 0.001;
+    assert.equal(movedX && movedY, false, `frame ${frame} cut the wall corner diagonally`);
+    if (movedY) {
+      reachedSecondSegment = true;
+      assert.equal(result.x, target.x);
+    }
+    current = { ...current, x: result.x, y: result.y };
+  }
+
+  assert.equal(reachedSecondSegment, true);
+  assert.ok(Math.abs(current.x - target.x) < 0.01);
+  assert.ok(Math.abs(current.y - target.y) < 0.01);
+});
+
+test("remote portal transitions snap instead of interpolating through obstacles", () => {
+  const current = { id: "remote", x: 60, y: 60, portalSequence: 0 };
+  const target = { ...current, x: 380, y: 300, portalSequence: 1 };
+  assert.deepEqual(interpolateRemotePlayer(current, target, 0.2), {
+    x: 380,
+    y: 300,
+    teleported: true,
+  });
+});
 
 test("local movement keeps advancing while an authoritative snapshot is stale", () => {
   const target = { id: "self", x: 80, y: 60, moveSpeed: 112, facing: "right", moveTarget: { x: 100, y: 60, tileX: 2, tileY: 1 } };

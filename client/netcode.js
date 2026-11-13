@@ -222,6 +222,45 @@ function sameMoveTarget(first, second) {
   return first.tileX === second.tileX && first.tileY === second.tileY;
 }
 
+function routeAxis(player) {
+  if (player.moveTarget) {
+    const dx = Math.abs(player.moveTarget.x - player.x);
+    const dy = Math.abs(player.moveTarget.y - player.y);
+    if (dx > 0.001 || dy > 0.001) return dx >= dy ? 'horizontal' : 'vertical';
+  }
+  return player.facing === 'up' || player.facing === 'down' ? 'vertical' : 'horizontal';
+}
+
+function smoothCoordinate(current, target, amount) {
+  const difference = target - current;
+  if (Math.abs(difference) < 0.35) return target;
+  return current + difference * amount;
+}
+
+/**
+ * Suaviza jogadores remotos sem cortar diagonalmente o canto de uma parede.
+ * Quando dois eixos diferem, primeiro alcançamos o eixo perpendicular à rota
+ * autoritativa e somente depois continuamos na direção atual do servidor.
+ */
+export function interpolateRemotePlayer(current, target, smoothing) {
+  if ((target.portalSequence || 0) !== (current.portalSequence || 0)) {
+    return { x: target.x, y: target.y, teleported: true };
+  }
+  const amount = Math.max(0, Math.min(1, Number(smoothing) || 0));
+  let x = current.x;
+  let y = current.y;
+  const differsX = Math.abs(target.x - x) > 0.001;
+  const differsY = Math.abs(target.y - y) > 0.001;
+
+  if (differsX && differsY) {
+    if (routeAxis(target) === 'vertical') x = smoothCoordinate(x, target.x, amount);
+    else y = smoothCoordinate(y, target.y, amount);
+  } else if (differsX) x = smoothCoordinate(x, target.x, amount);
+  else if (differsY) y = smoothCoordinate(y, target.y, amount);
+
+  return { x, y, teleported: false };
+}
+
 /**
  * Aproxima duas posições sem criar movimento diagonal.
  *
@@ -255,6 +294,15 @@ function correctAlongOneAxis(current, target, maximumTravel, useTargetRoute = fa
 }
 
 export function reconcileLocalPlayer(current, target, state, input, elapsedMs, predictionMs) {
+  // A portal is an intentional discontinuity. Interpolating this correction
+  // would drag the player through walls and make the teleport look like lag.
+  if ((target.portalSequence || 0) !== (current.portalSequence || 0)) {
+    return {
+      ...target,
+      moveTarget: target.moveTarget ? { ...target.moveTarget } : null,
+      predictedDirectionSequence: current.predictedDirectionSequence || 0,
+    };
+  }
   if (target.alive === false) {
     return {
       ...target,

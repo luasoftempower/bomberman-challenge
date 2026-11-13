@@ -36,7 +36,7 @@ import {
 
 import { createInputController } from "./input.js";
 import { activeHudPowerups } from "./gameplay-guide.js";
-import { reconcileLocalPlayer } from "./netcode.js";
+import { interpolateRemotePlayer, reconcileLocalPlayer } from "./netcode.js";
 
 import {
   renderGame,
@@ -381,8 +381,12 @@ function startRenderLoop() {
 
         // Outros jogadores.
         else {
-          current.x += (target.x - current.x) * smoothing;
-          current.y += (target.y - current.y) * smoothing;
+          const interpolated = interpolateRemotePlayer(current, target, smoothing);
+          current.x = interpolated.x;
+          current.y = interpolated.y;
+          if (interpolated.teleported) {
+            current.moveTarget = target.moveTarget ? { ...target.moveTarget } : null;
+          }
 
           const displayX = current.x;
           const displayY = current.y;
