@@ -435,10 +435,12 @@ async function loadOverallRanking(container) {
     const entries = await response.json();
     if (!container.isConnected) return;
     container.innerHTML = entries.length
-      ? `<ol role="list">${entries.map(({ name, score }, index) => `
+      ? `<ol role="list">${entries.map(({ name, score, demo }, index) => `
           <li>
             <span class="overall-position">${text("result.position", { position: index + 1 })}</span>
-            <strong>${escapeHtml(name)}</strong>
+            <span class="overall-player"><strong>${escapeHtml(name)}</strong>
+              ${demo ? `<small>${text("ranking.demo")}</small>` : ""}
+            </span>
             <span class="overall-score">${text("ranking.points", { score })}</span>
           </li>`).join("")}</ol>`
       : `<p>${text("ranking.empty")}</p>`;

@@ -107,6 +107,8 @@ O ranking global no rodapé mostra os cinco melhores recordes individuais. Cada 
 
 O servidor usa um hash do e-mail normalizado para identificar recordes. O ranking público exibe o apelido usado na partida do recorde e a pontuação. Informar o e-mail dispensa senha e confirmação de endereço.
 
+O ranking global começa com quatro entradas demonstrativas marcadas como “Exemplo”. Elas saem da lista à medida que pontuações maiores ocupam as cinco vagas.
+
 O servidor grava o ranking em `data/leaderboard.sqlite`. Em produção, configure `LEADERBOARD_DIR` para apontar para um diretório gravável em um volume persistente, fora dos diretórios públicos. No Render, o plano gratuito usa armazenamento efêmero e perde os dados locais quando o serviço reinicia ou é reimplantado.
 
 ## 🧪 Testes e Build de Produção

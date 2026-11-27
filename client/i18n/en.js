@@ -349,6 +349,7 @@ export default {
   "result.ranking": "Match leaderboard",
   "ranking.overall": "Global leaderboard",
   "ranking.description": "The 5 highest individual scores from a single match.",
+  "ranking.demo": "Example",
   "ranking.email": "Email for the global leaderboard (optional)",
   "ranking.emailHelp": "Use the same email in other matches to keep your record.",
   "ranking.points": "{score} pts",

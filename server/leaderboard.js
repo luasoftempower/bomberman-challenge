@@ -2,6 +2,13 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+const DEMO_RECORDS = [
+  { name: "Moreira", score: 40, demo: true },
+  { name: "Saniel", score: 30, demo: true },
+  { name: "Luana", score: 20, demo: true },
+  { name: "Felipe", score: 10, demo: true },
+];
+
 export function openLeaderboard(path) {
   const filename = resolve(path);
   mkdirSync(dirname(filename), { recursive: true });
@@ -37,7 +44,12 @@ export function openLeaderboard(path) {
         throw error;
       }
     },
-    topFive: () => list.all(),
+    topFive() {
+      // A ordenação estável mantém o exemplo à frente quando há empate.
+      return [...DEMO_RECORDS, ...list.all()]
+        .sort((left, right) => right.score - left.score)
+        .slice(0, 5);
+    },
     close: () => db.close(),
   };
 }

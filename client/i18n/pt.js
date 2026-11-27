@@ -349,6 +349,7 @@ export default {
   "result.ranking": "Ranking da partida",
   "ranking.overall": "Ranking global",
   "ranking.description": "Os 5 melhores recordes individuais em uma única partida.",
+  "ranking.demo": "Exemplo",
   "ranking.email": "E-mail para o ranking global (opcional)",
   "ranking.emailHelp": "Use o mesmo e-mail em outras partidas para manter seu recorde.",
   "ranking.points": "{score} pts",

@@ -15,20 +15,38 @@ test("the global top five keep one single-match record per email across database
     rmSync(directory, { recursive: true, force: true });
   });
 
-  assert.deepEqual(leaderboard.topFive(), []);
+  assert.deepEqual(leaderboard.topFive().map(({ name, score, demo }) => [name, score, demo]), [
+    ["Moreira", 40, true],
+    ["Saniel", 30, true],
+    ["Luana", 20, true],
+    ["Felipe", 10, true],
+  ]);
+  leaderboard.recordMatch([
+    { rankingKey: "0", name: "Jogador", score: 10 },
+    { rankingKey: "1", name: "Outro jogador", score: 10 },
+  ]);
+  assert.deepEqual(leaderboard.topFive().map(({ name }) => name), [
+    "Moreira", "Saniel", "Luana", "Felipe", "Jogador",
+  ]);
+  leaderboard.recordMatch([{ rankingKey: "1", name: "Outro jogador", score: 20 }]);
+  leaderboard.recordMatch([{ rankingKey: "0", name: "Jogador", score: 20 }]);
+  assert.deepEqual(leaderboard.topFive().map(({ name }) => name), [
+    "Moreira", "Saniel", "Luana", "Jogador", "Outro jogador",
+  ]);
   leaderboard.recordMatch(Array.from({ length: 6 }, (_, index) => ({
     rankingKey: String(index),
     name: "Jogador",
-    score: (index + 1) * 10,
+    score: (index + 5) * 10,
   })));
-  leaderboard.recordMatch([{ rankingKey: "0", name: "Novo apelido", score: 70 }]);
+  leaderboard.recordMatch([{ rankingKey: "0", name: "Novo apelido", score: 110 }]);
   leaderboard.recordMatch([{ rankingKey: "0", name: "Partida pior", score: 40 }]);
-  leaderboard.recordMatch([{ rankingKey: "0", name: "Empatou o recorde", score: 70 }]);
+  leaderboard.recordMatch([{ rankingKey: "0", name: "Empatou o recorde", score: 110 }]);
   leaderboard.close();
   leaderboard = openLeaderboard(filename);
 
   const entries = leaderboard.topFive();
-  assert.deepEqual(entries.map(({ score }) => score), [70, 60, 50, 40, 30]);
+  assert.deepEqual(entries.map(({ score }) => score), [110, 100, 90, 80, 70]);
+  assert(entries.every(({ demo }) => !demo));
   assert.equal(entries[0].name, "Novo apelido");
   assert.deepEqual(Object.keys(entries[0]), ["name", "score"]);
 });

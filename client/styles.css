@@ -185,7 +185,17 @@ footer i { width:32px; height:1px; background:var(--line); }
   padding: 6px 10px;
   background: #101726;
 }
-.overall-ranking li strong { overflow-wrap: anywhere; }
+.overall-player {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  overflow-wrap: anywhere;
+}
+.overall-player small {
+  color: var(--text-muted-readable);
+  font-size: var(--font-readable-meta);
+}
 .overall-position,
 .overall-score { font: 500 clamp(11px, 2vw, 14px) Silkscreen; }
 .overall-position { color: var(--text-muted-readable); }
