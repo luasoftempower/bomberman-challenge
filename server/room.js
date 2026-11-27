@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { decideBotInput } from "../shared/bots.js";
 import { STANDARD_MAPS, validateCustomMap } from '../shared/maps.js';
 import {
@@ -33,6 +33,14 @@ const MAX_SNAPSHOT_BACKLOG_BYTES = 4 * 1024;
 // Quatro passos recuperam travadas de até 100 ms. Mais que isso criava rajadas
 // pesadas de IA/física e um salto perceptível para todos os jogadores.
 const MAX_CATCH_UP_STEPS = 4;
+const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
+
+function rankingKeyFor(email) {
+  if (typeof email !== "string" || email.length > 254) return null;
+  const normalized = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(normalized)) return null;
+  return createHash("sha256").update(normalized).digest("hex");
+}
 
 // ============================================================
 // DIREÇÕES
@@ -151,9 +159,10 @@ const send = (
 // ============================================================
 
 export class Room {
-  constructor(code, hostToken) {
+  constructor(code, hostToken, recordScores = () => {}) {
     this.code = code;
     this.hostToken = hostToken;
+    this.recordScores = recordScores;
 
     this.hostId = null;
 
@@ -227,6 +236,7 @@ export class Room {
     {
       name,
       hostToken,
+      email,
     },
   ) {
     if (this.phase !== "lobby") {
@@ -272,6 +282,7 @@ export class Room {
       kind: "human",
       ready: false,
       socket,
+      rankingKey: rankingKeyFor(email),
     });
 
     if (
@@ -396,28 +407,15 @@ export class Room {
    * depois da partida.
    */
   standingsPayload() {
-    return this.slots
-      .filter(
-        (slot) =>
-          slot.kind !== "empty",
-      )
-      .map(
-        ({
-          slot,
-          id,
-          name,
-          kind,
-        }) => ({
-          slot,
-          id,
-          name,
-          kind,
-
-          trophies:
-            this.trophies.get(id) ||
-            0,
-        }),
-      );
+    return this.state.players.map(({ slot, id, name, kind, alive, score }) => ({
+      slot,
+      id,
+      name,
+      kind,
+      alive,
+      score,
+      trophies: this.trophies.get(id) || 0,
+    })).sort((left, right) => right.score - left.score || left.slot - right.slot);
   }
 
 
@@ -1388,6 +1386,13 @@ removeBot(playerId) {
         );
       }
 
+      const standings = this.standingsPayload();
+      const humanScores = standings.flatMap(({ slot, name, score }) => {
+        const { rankingKey, scoreAtDisconnect } = this.slots[slot];
+        return rankingKey ? [{ rankingKey, name, score: scoreAtDisconnect ?? score }] : [];
+      });
+      this.recordScores(humanScores);
+
       this.broadcast({
         type: "matchEnd",
 
@@ -1397,8 +1402,7 @@ removeBot(playerId) {
         reason:
           this.endReason,
 
-        standings:
-          this.standingsPayload(),
+        standings,
       });
     }
   }
@@ -1439,6 +1443,7 @@ removeBot(playerId) {
         );
 
       if (gamePlayer) {
+        slot.scoreAtDisconnect ??= gamePlayer.score;
         gamePlayer.kind =
           "bot";
       }

@@ -2,13 +2,16 @@ import express from "express";
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { WebSocketServer } from "ws";
 import { makeCode, Room, startRoomLoop } from "./room.js";
+import { openLeaderboard } from "./leaderboard.js";
 
 const app = express();
 const server = createServer(app);
 const port = Number(process.env.PORT || 3000);
 const rooms = new Map();
+const leaderboard = openLeaderboard(join(process.env.LEADERBOARD_DIR || "data", "leaderboard.sqlite"));
 const webSockets = new WebSocketServer({
   noServer: true,
   maxPayload: 4096,
@@ -23,11 +26,21 @@ const webSockets = new WebSocketServer({
 
 app.use(express.json({ limit: "8kb" }));
 
+app.get("/api/leaderboard", (_request, response) => {
+  response.set("Cache-Control", "no-store").json(leaderboard.topFive());
+});
+
 app.post("/api/rooms", (_request, response) => {
   let code;
   do code = makeCode(); while (rooms.has(code));
   const hostToken = randomBytes(16).toString("hex");
-  rooms.set(code, new Room(code, hostToken));
+  rooms.set(code, new Room(code, hostToken, (scores) => {
+    try {
+      leaderboard.recordMatch(scores);
+    } catch (error) {
+      console.error("Failed to save match scores", error);
+    }
+  }));
   response.status(201).json({ roomCode: code, hostToken, path: `/r/${code}` });
 });
 
@@ -47,7 +60,13 @@ if (process.env.NODE_ENV === "production") {
   app.get(["/", "/r/:code"], (_request, response) => response.type("html").send(indexHtml));
 } else {
   const { createServer: createViteServer } = await import("vite");
-  const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+  const vite = await createViteServer({
+    server: {
+      middlewareMode: true,
+      fs: { deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "leaderboard.sqlite*"] },
+    },
+    appType: "spa",
+  });
   app.use(vite.middlewares);
 }
 

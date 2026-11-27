@@ -55,6 +55,36 @@ test("a blast stops at and destroys exactly the first destructible block", () =>
   assert.equal(state.grid[indexOf(4, 3)], CRATE);
   assert(state.blasts.some((blast) => blast.x === 3 && blast.y === 3));
   assert(!state.blasts.some((blast) => blast.x === 4 && blast.y === 3));
+  assert.equal(state.players[0].score, 10);
+});
+
+test("a chained bomb credits its owner for a rival elimination only once", () => {
+  const state = superState();
+  const [first, second, rival] = state.players;
+  second.x = 6.5 * TILE_SIZE;
+  second.y = 5.5 * TILE_SIZE;
+  rival.x = 7.5 * TILE_SIZE;
+  rival.y = 5.5 * TILE_SIZE;
+  state.bombs = [bomb(1, 4, 5), { ...bomb(2, 6, 5), ownerId: second.id }];
+
+  forceDetonate(state, [1]);
+  step(state);
+
+  assert.deepEqual([first.score, second.score, rival.score], [100, 100, 0]);
+});
+
+test("overlapping blasts award a single elimination and powerups count only when collected", () => {
+  const state = superState();
+  const [first, second, rival] = state.players;
+  state.powerups = [{ id: 1, type: "speed", x: Math.floor(first.x / TILE_SIZE), y: Math.floor(first.y / TILE_SIZE) }];
+  rival.x = 5.5 * TILE_SIZE;
+  rival.y = 5.5 * TILE_SIZE;
+  state.blasts = [{ x: 5, y: 5, ttl: 1, ownerIds: [first.id, second.id] }];
+
+  step(state);
+  step(state);
+
+  assert.deepEqual([first.score, second.score, rival.score], [125, 0, 0]);
 });
 
 test("a blast crosses empty tiles only up to its range", () => {
