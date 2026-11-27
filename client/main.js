@@ -509,7 +509,7 @@ function renderLanding({ forceIntro = false } = {}) {
 
         sessionStorage.setItem(
           `blast-host-${data.roomCode}`,
-          { hostToken: data.hostToken, email },
+          data.hostToken,
         );
 
         history.pushState(
@@ -521,7 +521,7 @@ function renderLanding({ forceIntro = false } = {}) {
         connectToRoom(
           data.roomCode,
           name,
-          data.hostToken,
+          { hostToken: data.hostToken, email },
         );
       } catch {
         root.querySelector("#form-error").innerHTML = text("error.retry");
