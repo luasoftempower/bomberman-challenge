@@ -62,7 +62,7 @@ As vagas livres são preenchidas automaticamente por **bots inteligentes** capaz
 ## 🚀 Como Executar Localmente
 
 ### Pré-requisitos
-* Node.js `22` ou superior.
+* Node.js `22.13` ou superior.
 * pnpm `11` ou superior.
 
 ### 1. Clonar e Instalar
@@ -98,6 +98,14 @@ docker run --rm -p 3000:3000 -e PUBLIC_ORIGIN=http://localhost:3000 raivolt
 ```
 
 ---
+
+## Pontuação e rankings
+
+Cada bloco destruído pela sua bomba vale 10 pontos, cada power-up coletado vale 25 e cada rival eliminado pela sua bomba vale 100. A classificação de fim de partida inclui humanos e bots e ordena pelos pontos da rodada. O último sobrevivente continua vencendo a partida e ganhando o troféu.
+
+Os pontos dos jogadores humanos são somados ao final de cada partida, inclusive em revanches e em salas diferentes. O ranking geral no rodapé da página inicial mostra os cinco maiores totais. A identidade é salva no perfil do navegador e é independente do apelido. Outro perfil de navegador ou a limpeza dos dados do site cria uma nova identidade.
+
+O servidor grava o ranking em `data/leaderboard.sqlite`. Em produção, configure `LEADERBOARD_DIR` para apontar para um diretório gravável em um volume persistente, fora dos diretórios públicos. No Render, o plano gratuito usa armazenamento efêmero e perde os dados locais quando o serviço reinicia ou é reimplantado.
 
 ## 🧪 Testes e Build de Produção
 

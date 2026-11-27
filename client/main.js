@@ -167,6 +167,17 @@ const roomFromPath = () =>
  */
 const getName = () => localStorage.getItem("blast-name") || t("common.defaultName");
 
+function getRankingToken() {
+  const key = "blast-ranking-token";
+  const stored = localStorage.getItem(key);
+  if (stored && /^[a-f0-9]{32}$/.test(stored)) return stored;
+
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  localStorage.setItem(key, token);
+  return token;
+}
+
 // ============================================================
 // CONTROLE DE ANIMAÇÕES E TRANSIÇÕES
 // ============================================================
@@ -428,9 +439,25 @@ function stopRenderLoop() {
 // MENU PRINCIPAL
 // ============================================================
 
-/**
- * Renderiza a tela inicial do Raivolt.
- */
+async function loadOverallRanking(container) {
+  try {
+    const response = await fetch("/api/leaderboard");
+    if (!response.ok) throw new Error("Leaderboard unavailable");
+    const entries = await response.json();
+    if (!container.isConnected) return;
+    container.innerHTML = entries.length
+      ? `<ol role="list">${entries.map(({ name, score }, index) => `
+          <li>
+            <span class="overall-position">${text("result.position", { position: index + 1 })}</span>
+            <strong>${escapeHtml(name)}</strong>
+            <span class="overall-score">${text("ranking.points", { score })}</span>
+          </li>`).join("")}</ol>`
+      : `<p>${text("ranking.empty")}</p>`;
+  } catch {
+    if (container.isConnected) container.innerHTML = `<p>${text("ranking.unavailable")}</p>`;
+  }
+}
+
 function renderLanding({ forceIntro = false } = {}) {
   closeMapEditor();
   setMenuMusicActive(true);
@@ -454,6 +481,7 @@ function renderLanding({ forceIntro = false } = {}) {
   // Entrega ao componente apenas os dados usados para montar a página inicial.
   // O nome salvo é preservado; somente o nome padrão vem do dicionário de idioma.
   root.innerHTML = landingMarkup({ showIntro, playerName: getName() });
+  loadOverallRanking(root.querySelector("#overall-ranking-entries"));
   paintPowerupIcons(root);
   initializeGameplayGuide(root);
 
@@ -617,6 +645,7 @@ function connectToRoom(
           roomCode: code,
           name,
           hostToken,
+          rankingToken: getRankingToken(),
         }),
       );
     },
@@ -1227,19 +1256,9 @@ function renderResult(winnerSlot, standings = [], reason = "elimination") {
   stopRenderLoop();
   stopVictory();
 
-  const scoreById = new Map(standings.map((entry) => [entry.id, Number(entry.trophies) || 0]));
-  const competitors = latestSnapshot?.players?.length ? latestSnapshot.players : standings;
-  const ranking = competitors.map((candidate) => ({
-    ...candidate,
-    trophies: scoreById.get(candidate.id) || 0,
-  })).sort((left, right) => {
-    const leftWon = left.slot === winnerSlot;
-    const rightWon = right.slot === winnerSlot;
-    if (leftWon !== rightWon) return leftWon ? -1 : 1;
-    return right.trophies - left.trophies || left.slot - right.slot;
-  });
+  const ranking = standings;
   const winner = ranking.find((candidate) => candidate.slot === winnerSlot);
-  const headingKey = winner ? "result.first" : "result.draw";
+  const headingKey = winner ? "result.victory" : "result.draw";
   const subtitleKey = winner
     ? "result.winnerDescription"
     : reason === "timeout"
@@ -1280,10 +1299,15 @@ function renderResult(winnerSlot, standings = [], reason = "elimination") {
       const character = isDraw
         ? `<img class="battle-avatar draw-result-avatar" src="/player-avatar-${candidate.slot + 1}.png" alt="" />`
         : `<canvas class="battle-avatar result-character-canvas" width="112" height="96" data-result-slot="${candidate.slot}" data-result-mood="${mood}" role="img" ${attr("aria-label", isWinner ? "result.celebrating" : "result.crying", { name: candidate.name })}></canvas>`;
-      return `<article class="battle-rank-row ${isWinner ? "champion" : isDraw ? "tied" : "crying"}" style="--rank-color:${PLAYER_COLORS[candidate.slot]};--rank-delay:${.24 + index * .12}s"><span class="battle-position">${isDraw ? "=" : text("result.position", { position: index + 1 })}</span><div class="battle-character">${character}${isWinner ? `<span class="trophy-flight" aria-hidden="true"><img src="/trophy-pixel.png" alt="" /></span>` : ""}</div><div class="battle-player-copy"><strong>${escapeHtml(candidate.name)}</strong><small>${status}</small></div><div class="battle-trophy-total"><img src="/trophy-pixel.png" alt="" /><span><b>${candidate.trophies}</b><small>${text("common.trophies")}</small></span></div></article>`;
+      return `<article class="battle-rank-row ${isWinner ? "champion" : isDraw ? "tied" : "crying"}" style="--rank-color:${PLAYER_COLORS[candidate.slot]};--rank-delay:${.24 + index * .12}s">
+        <span class="battle-position">${text("result.position", { position: index + 1 })}</span>
+        <div class="battle-character">${character}${isWinner ? `<span class="trophy-flight" aria-hidden="true"><img src="/trophy-pixel.png" alt="" /></span>` : ""}</div>
+        <div class="battle-player-copy"><strong>${escapeHtml(candidate.name)}</strong><small>${status}</small><span class="battle-score">${text("ranking.points", { score: candidate.score })}</span></div>
+        <div class="battle-trophy-total"><img src="/trophy-pixel.png" alt="" /><span><b>${candidate.trophies}</b><small>${text("common.trophies")}</small></span></div>
+      </article>`;
     }).join("");
 
-    root.insertAdjacentHTML("beforeend", `<section class="result-overlay battle-result-overlay"><div class="settings-corner">${settingsMenu()}</div><div class="result-pixel-rain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="battle-result-board ${winner ? "has-champion" : "is-draw"}" style="--trophy-delay:${TROPHY_ANIMATION_DELAY_MS}ms;--trophy-duration:${TROPHY_ANIMATION_DURATION_MS}ms"><header class="battle-result-header"><span>${text("result.battleEnd")}</span><h2>${text(headingKey)}</h2><p>${text(subtitleKey, { name: winner?.name })}</p></header><div class="battle-ranking" ${attr("aria-label", "result.ranking")}>${rankingMarkup}</div><footer class="battle-result-actions">${player.isHost ? `<button class="result-rematch-button" id="rematch-button" type="button"><span><small>${text("result.sameTeam")}</small>${text("result.playAgain")}</span><b>↻</b></button>` : `<div class="host-wait"><i></i> ${text("result.waitHost")}</div>`}<button class="result-exit-button" id="exit-room-button" type="button"><span><small>${text("result.endSession")}</small>${text("result.exit")}</span><b>×</b></button></footer></div></section>`);
+    root.insertAdjacentHTML("beforeend", `<section class="result-overlay battle-result-overlay"><div class="settings-corner">${settingsMenu()}</div><div class="result-pixel-rain" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="battle-result-board ${winner ? "has-champion" : "is-draw"}" style="--trophy-delay:${TROPHY_ANIMATION_DELAY_MS}ms;--trophy-duration:${TROPHY_ANIMATION_DURATION_MS}ms"><header class="battle-result-header"><span>${text("result.battleEnd")}</span><h2>${text(headingKey)}</h2><p>${text(subtitleKey, { name: winner?.name })}</p></header><section class="battle-ranking" aria-labelledby="battle-ranking-title"><h3 id="battle-ranking-title">${text("result.ranking")}</h3>${rankingMarkup}</section><footer class="battle-result-actions">${player.isHost ? `<button class="result-rematch-button" id="rematch-button" type="button"><span><small>${text("result.sameTeam")}</small>${text("result.playAgain")}</span><b>↻</b></button>` : `<div class="host-wait"><i></i> ${text("result.waitHost")}</div>`}<button class="result-exit-button" id="exit-room-button" type="button"><span><small>${text("result.endSession")}</small>${text("result.exit")}</span><b>×</b></button></footer></div></section>`);
 
     const characterStops = [...root.querySelectorAll(".result-character-canvas")].map((canvas) =>
       startResultCharacterAnimation(canvas, Number(canvas.dataset.resultSlot), canvas.dataset.resultMood));

@@ -164,6 +164,17 @@ function menuFooter() {
   `;
 }
 
+function overallRanking() {
+  return `
+    <section class="overall-ranking" aria-labelledby="overall-ranking-title">
+      <h2 id="overall-ranking-title">${text("ranking.overall")}</h2>
+      <div id="overall-ranking-entries" aria-live="polite">
+        <p>${text("ranking.loading")}</p>
+      </div>
+    </section>
+  `;
+}
+
 // Ponto de entrada da composição: recebe as informações necessárias em um objeto
 // e devolve uma string de HTML. Eventos, conexão e estado do jogo ficam no main.js.
 // showIntro controla tanto a abertura quanto a classe usada nas animações CSS.
@@ -181,6 +192,7 @@ export function landingMarkup({ showIntro, playerName }) {
         ${heroArt()}
       </section>
       ${menuFooter()}
+      ${overallRanking()}
       ${gameplayGuideMarkup()}
     </main>
   `;

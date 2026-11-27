@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { decideBotInput } from "../shared/bots.js";
 import { STANDARD_MAPS, validateCustomMap } from '../shared/maps.js';
 import {
@@ -151,9 +151,10 @@ const send = (
 // ============================================================
 
 export class Room {
-  constructor(code, hostToken) {
+  constructor(code, hostToken, recordScores = () => {}) {
     this.code = code;
     this.hostToken = hostToken;
+    this.recordScores = recordScores;
 
     this.hostId = null;
 
@@ -227,6 +228,7 @@ export class Room {
     {
       name,
       hostToken,
+      rankingToken,
     },
   ) {
     if (this.phase !== "lobby") {
@@ -272,6 +274,9 @@ export class Room {
       kind: "human",
       ready: false,
       socket,
+      rankingKey: typeof rankingToken === "string" && /^[a-f0-9]{32}$/.test(rankingToken)
+        ? createHash("sha256").update(rankingToken).digest("hex")
+        : id,
     });
 
     if (
@@ -396,28 +401,15 @@ export class Room {
    * depois da partida.
    */
   standingsPayload() {
-    return this.slots
-      .filter(
-        (slot) =>
-          slot.kind !== "empty",
-      )
-      .map(
-        ({
-          slot,
-          id,
-          name,
-          kind,
-        }) => ({
-          slot,
-          id,
-          name,
-          kind,
-
-          trophies:
-            this.trophies.get(id) ||
-            0,
-        }),
-      );
+    return this.state.players.map(({ slot, id, name, kind, alive, score }) => ({
+      slot,
+      id,
+      name,
+      kind,
+      alive,
+      score,
+      trophies: this.trophies.get(id) || 0,
+    })).sort((left, right) => right.score - left.score || left.slot - right.slot);
   }
 
 
@@ -1388,6 +1380,13 @@ removeBot(playerId) {
         );
       }
 
+      const standings = this.standingsPayload();
+      const humanScores = standings.flatMap(({ slot, name, score }) => {
+        const { rankingKey, scoreAtDisconnect } = this.slots[slot];
+        return rankingKey ? [{ rankingKey, name, score: scoreAtDisconnect ?? score }] : [];
+      });
+      this.recordScores(humanScores);
+
       this.broadcast({
         type: "matchEnd",
 
@@ -1397,8 +1396,7 @@ removeBot(playerId) {
         reason:
           this.endReason,
 
-        standings:
-          this.standingsPayload(),
+        standings,
       });
     }
   }
@@ -1439,6 +1437,7 @@ removeBot(playerId) {
         );
 
       if (gamePlayer) {
+        slot.scoreAtDisconnect ??= gamePlayer.score;
         gamePlayer.kind =
           "bot";
       }

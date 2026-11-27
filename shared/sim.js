@@ -88,11 +88,14 @@ export function createGrid(seed = Date.now(), { arenaType = ARENA_TYPES.SQUARE }
   return grid.join("");
 }
 
+const SCORE = { crate: 10, elimination: 100, powerup: 25 };
+
 export function createPlayer({ id, slot, name, kind = "human" }, arenaType = ARENA_TYPES.SQUARE) {
   const spawn = spawnsForArena(arenaType)[slot];
   if (!spawn) throw new Error(`No spawn configured for slot ${slot} in ${arenaType} arena`);
   return {
     id, slot, name, kind,
+    score: 0,
     x: (spawn.x + 0.5) * TILE_SIZE,
     y: (spawn.y + 0.5) * TILE_SIZE,
     alive: true,
@@ -483,6 +486,7 @@ function detonateBombs(state, initialIds) {
     const bomb = state.bombs.find((candidate) => candidate.id === id);
     if (!bomb) continue;
     detonated.add(id);
+    const owner = state.players.find((player) => player.id === bomb.ownerId);
     for (const tile of blastTiles(state, bomb)) {
       const key = `${tile.x},${tile.y}`;
       const existing = state.blasts.find((blast) => `${blast.x},${blast.y}` === key);
@@ -493,6 +497,7 @@ function detonateBombs(state, initialIds) {
       const wasCrate = tileAt(state.grid, tile.x, tile.y) === CRATE;
       if (wasCrate) {
         setTile(state, tile.x, tile.y, EMPTY);
+        if (owner) owner.score += SCORE.crate;
         maybeSpawnPowerup(state, tile.x, tile.y);
       } else {
         state.powerups = state.powerups.filter((powerup) => powerup.x !== tile.x || powerup.y !== tile.y);
@@ -506,17 +511,23 @@ function detonateBombs(state, initialIds) {
 }
 
 function applyBlastDamage(state) {
-  const lethal = new Set(state.blasts.map((blast) => `${blast.x},${blast.y}`));
+  const blastsByTile = new Map(state.blasts.map((blast) => [`${blast.x},${blast.y}`, blast]));
   const killedPlayers = [];
   const hitOwnersByVictim = new Map();
   for (const player of state.players) {
     if (!player.alive || player.invincibleUntilTick > state.tick) continue;
     const tile = `${Math.floor(player.x / TILE_SIZE)},${Math.floor(player.y / TILE_SIZE)}`;
-    if (lethal.has(tile)) {
+    const blast = blastsByTile.get(tile);
+    if (blast) {
       player.alive = false;
       killedPlayers.push(player);
-      const [x, y] = tile.split(",").map(Number);
-      const owners = state.blasts.find((blast) => blast.x === x && blast.y === y)?.ownerIds || [];
+      const owners = blast.ownerIds || [];
+      // Uma eliminação vale pontos para o primeiro dono rival da explosão.
+      const scorer = owners
+        .filter((id) => id !== player.id)
+        .map((id) => state.players.find((candidate) => candidate.id === id))
+        .find(Boolean);
+      if (scorer) scorer.score += SCORE.elimination;
       hitOwnersByVictim.set(player.id, new Set(owners));
       if (!sendToEdge(state, player)) player.edgeActive = false;
     }
@@ -550,6 +561,7 @@ function collectPowerups(state, player) {
   const collected = state.powerups.filter((powerup) => powerup.x === x && powerup.y === y);
   if (!collected.length) return;
   for (const powerup of collected) applyPowerup(state, player, powerup.type);
+  player.score += collected.length * SCORE.powerup;
   const ids = new Set(collected.map((powerup) => powerup.id));
   state.powerups = state.powerups.filter((powerup) => !ids.has(powerup.id));
 }

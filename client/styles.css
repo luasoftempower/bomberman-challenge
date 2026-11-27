@@ -89,7 +89,7 @@ footer i { width:32px; height:1px; background:var(--line); }
 }
 
 /* Main arcade menu */
-.menu-home { min-height:100vh; position:relative; isolation:isolate; overflow:hidden; display:grid; grid-template-rows:auto 1fr auto; padding:24px clamp(22px,5vw,78px) 18px; background:radial-gradient(circle at 72% 44%,rgba(77,197,228,.2),transparent 31%), radial-gradient(circle at 20% 72%,rgba(139,92,246,.16),transparent 34%), linear-gradient(135deg,#17243a 0%,#101726 52%,#0a0e19 100%); }
+.menu-home { min-height:100vh; position:relative; isolation:isolate; overflow:hidden; display:grid; grid-template-rows:auto 1fr auto auto; padding:24px clamp(22px,5vw,78px) 18px; background:radial-gradient(circle at 72% 44%,rgba(77,197,228,.2),transparent 31%), radial-gradient(circle at 20% 72%,rgba(139,92,246,.16),transparent 34%), linear-gradient(135deg,#17243a 0%,#101726 52%,#0a0e19 100%); }
 .menu-home::before { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(120deg,transparent 0 47%,rgba(255,255,255,.025) 47% 48%,transparent 48% 100%), linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px), linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px); background-size:auto,48px 48px,48px 48px; mask-image:linear-gradient(to bottom,#000,transparent 90%); }
 .menu-home::after { content:""; position:absolute; z-index:-1; width:520px; height:520px; right:-120px; top:12%; border:80px solid rgba(255,255,255,.018); border-radius:50%; box-shadow:0 0 0 42px rgba(255,255,255,.012),0 0 0 100px rgba(255,255,255,.009); }
 .menu-header { width:min(1320px,100%); margin:0 auto; display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:18px; position:relative; z-index:5; }
@@ -146,6 +146,44 @@ footer i { width:32px; height:1px; background:var(--line); }
 .menu-footer { width:min(1280px,100%); margin:0 auto; display:flex; justify-content:center; align-items:center; gap:24px; padding:12px 20px; border-top:3px solid #506f32; background:rgba(6,9,17,.62); color:#81899c; font:500 9px Silkscreen; letter-spacing:.09em; }
 .menu-footer b { color:#d9ff75; }
 .menu-footer i { width:4px; height:4px; background:#4b5364; transform:rotate(45deg); }
+.overall-ranking {
+  width: min(1280px, 100%);
+  margin: 16px auto 0;
+  padding: clamp(12px, 3vw, 24px);
+  border: 1px solid #60748a;
+  background: #182136;
+  color: #f8f5ff;
+}
+.has-intro:not(.intro-complete) .overall-ranking { visibility: hidden; }
+.overall-ranking h2 {
+  margin: 0 0 12px;
+  color: #f2c45e;
+  font: 500 clamp(14px, 2vw, 20px) Silkscreen;
+}
+.overall-ranking p {
+  margin: 0;
+  color: var(--text-muted-readable);
+}
+.overall-ranking ol {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.overall-ranking li {
+  display: grid;
+  grid-template-columns: 2.5em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #101726;
+}
+.overall-ranking li strong { overflow-wrap: anywhere; }
+.overall-position,
+.overall-score { font: 500 clamp(11px, 2vw, 14px) Silkscreen; }
+.overall-position { color: var(--text-muted-readable); }
+.overall-score { color: #f2c45e; }
 
 /* O guia usa <dialog>: foco, Esc e leitura assistiva ficam por conta do navegador. */
 .gameplay-guide-dialog { width:min(1320px,calc(100vw - 32px)); max-width:none; max-height:92vh; margin:auto; padding:0; overflow:visible; color:inherit; border:0; background:transparent; }
@@ -817,6 +855,17 @@ kbd { display:inline-block; min-width:24px; text-align:center; padding:4px 5px; 
 .battle-result-header h2 { margin:8px 0 7px; color:#fff; font:500 clamp(34px,6vw,64px)/.92 Silkscreen; letter-spacing:-.08em; text-shadow:6px 7px 0 #3a255e,0 0 28px rgba(170,116,255,.34); }
 .battle-result-header p { margin:0; color:#aaa2b8; font:400 clamp(9px,1.8vw,13px)/1.5 Silkscreen; }
 .battle-ranking { display:grid; gap:8px; }
+.battle-ranking h3 {
+  margin: 0;
+  color: var(--text-muted-readable);
+  font: 500 var(--font-readable-meta) Silkscreen;
+}
+.battle-score {
+  display: block;
+  margin-top: 4px;
+  color: var(--lime);
+  font: 500 var(--font-readable-meta) Silkscreen;
+}
 .battle-rank-row { min-height:82px; position:relative; display:grid; grid-template-columns:64px 96px minmax(0,1fr) 150px; align-items:center; padding:8px 18px 8px 8px; border:1px solid rgba(255,255,255,.09); border-left:5px solid var(--rank-color); background:linear-gradient(90deg,color-mix(in srgb,var(--rank-color),transparent 88%),rgba(255,255,255,.025)); box-shadow:inset 0 -3px 0 rgba(0,0,0,.26); opacity:0; animation:battleRankIn .48s steps(7,end) var(--rank-delay) forwards; }
 .battle-rank-row.champion { min-height:106px; border-color:rgba(255,221,86,.35); border-left-color:#ffd94d; background:linear-gradient(90deg,rgba(255,197,48,.2),rgba(255,255,255,.055) 62%,rgba(255,197,48,.08)); box-shadow:inset 0 -4px 0 rgba(0,0,0,.3),0 0 28px rgba(255,196,45,.1); }
 .battle-position { color:#8d849d; text-align:center; font:500 20px Silkscreen; text-shadow:3px 3px 0 #05040a; }
