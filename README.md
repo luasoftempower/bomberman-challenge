@@ -103,7 +103,9 @@ docker run --rm -p 3000:3000 -e PUBLIC_ORIGIN=http://localhost:3000 raivolt
 
 Cada bloco destruído pela sua bomba vale 10 pontos, cada power-up coletado vale 25 e cada rival eliminado pela sua bomba vale 100. A classificação de fim de partida inclui humanos e bots e ordena pelos pontos da rodada. O último sobrevivente continua vencendo a partida e ganhando o troféu.
 
-Os pontos dos jogadores humanos são somados ao final de cada partida, inclusive em revanches e em salas diferentes. O ranking geral no rodapé da página inicial mostra os cinco maiores totais. A identidade é salva no perfil do navegador e é independente do apelido. Outro perfil de navegador ou a limpeza dos dados do site cria uma nova identidade.
+O ranking global no rodapé mostra os cinco melhores recordes individuais. Cada recorde é a maior pontuação que o jogador fez em uma única partida. Para participar, informe o mesmo e-mail ao criar ou entrar em uma sala, em qualquer navegador. Jogadores sem e-mail continuam participando do ranking local da rodada.
+
+O servidor usa um hash do e-mail normalizado para identificar recordes. O ranking público exibe o apelido usado na partida do recorde e a pontuação. Informar o e-mail dispensa senha e confirmação de endereço.
 
 O servidor grava o ranking em `data/leaderboard.sqlite`. Em produção, configure `LEADERBOARD_DIR` para apontar para um diretório gravável em um volume persistente, fora dos diretórios públicos. No Render, o plano gratuito usa armazenamento efêmero e perde os dados locais quando o serviço reinicia ou é reimplantado.
 

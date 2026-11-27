@@ -33,6 +33,14 @@ const MAX_SNAPSHOT_BACKLOG_BYTES = 4 * 1024;
 // Quatro passos recuperam travadas de até 100 ms. Mais que isso criava rajadas
 // pesadas de IA/física e um salto perceptível para todos os jogadores.
 const MAX_CATCH_UP_STEPS = 4;
+const EMAIL_PATTERN = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
+
+function rankingKeyFor(email) {
+  if (typeof email !== "string" || email.length > 254) return null;
+  const normalized = email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(normalized)) return null;
+  return createHash("sha256").update(normalized).digest("hex");
+}
 
 // ============================================================
 // DIREÇÕES
@@ -228,7 +236,7 @@ export class Room {
     {
       name,
       hostToken,
-      rankingToken,
+      email,
     },
   ) {
     if (this.phase !== "lobby") {
@@ -274,9 +282,7 @@ export class Room {
       kind: "human",
       ready: false,
       socket,
-      rankingKey: typeof rankingToken === "string" && /^[a-f0-9]{32}$/.test(rankingToken)
-        ? createHash("sha256").update(rankingToken).digest("hex")
-        : id,
+      rankingKey: rankingKeyFor(email),
     });
 
     if (

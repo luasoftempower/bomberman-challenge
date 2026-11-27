@@ -10,7 +10,7 @@ import "./settings-menu.css";
 // operações compartilhadas, como tratar valores no HTML e formatar o tempo.
 import { activePowers, powerLegendMarkup, powerListMarkup } from "./components/power-legend.js";
 import { brand } from "./components/brand.js";
-import { landingMarkup, createRoomButtonContent } from "./components/landing.js";
+import { landingMarkup, createRoomButtonContent, rankingEmailField } from "./components/landing.js";
 import { compactPowerupLegendMarkup, initializeGameplayGuide, paintPowerupIcons } from "./components/gameplay-guide.js";
 import { initializeMenuIntro } from "./components/menu-intro.js";
 import { REPLAY_INTRO_EVENT, settingsMenu, initializeSettingsMenu } from "./settings-menu.js";
@@ -166,17 +166,6 @@ const roomFromPath = () =>
  * Recupera o nome salvo anteriormente no navegador.
  */
 const getName = () => localStorage.getItem("blast-name") || t("common.defaultName");
-
-function getRankingToken() {
-  const key = "blast-ranking-token";
-  const stored = localStorage.getItem(key);
-  if (stored && /^[a-f0-9]{32}$/.test(stored)) return stored;
-
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  localStorage.setItem(key, token);
-  return token;
-}
 
 // ============================================================
 // CONTROLE DE ANIMAÇÕES E TRANSIÇÕES
@@ -507,6 +496,7 @@ function renderLanding({ forceIntro = false } = {}) {
       button.innerHTML = text("menu.preparing");
 
       const name = saveName();
+      const email = root.querySelector("#ranking-email").value;
 
       try {
         const response = await fetch("/api/rooms", {
@@ -519,7 +509,7 @@ function renderLanding({ forceIntro = false } = {}) {
 
         sessionStorage.setItem(
           `blast-host-${data.roomCode}`,
-          data.hostToken,
+          { hostToken: data.hostToken, email },
         );
 
         history.pushState(
@@ -576,9 +566,11 @@ function saveName() {
 function joinFromLanding() {
   const code = root.querySelector("#room-code").value.trim().toUpperCase();
   if (!/^[A-Z2-9]{6}$/.test(code)) { root.querySelector("#form-error").innerHTML = text("error.code"); return; }
+  const emailField = root.querySelector("#ranking-email");
+  if (!emailField.reportValidity()) return;
   const name = saveName();
   history.pushState({}, "", `/r/${code}`);
-  connectToRoom(code, name);
+  connectToRoom(code, name, { email: emailField.value });
 }
 
 /**
@@ -587,8 +579,13 @@ function joinFromLanding() {
  */
 function renderDirectJoin(code) {
   setMenuMusicActive(true);
-  root.innerHTML = `<main class="center-shell"><nav>${brand()}${settingsMenu()}</nav><form class="compact-card" id="direct-join"><div class="card-kicker">${text("common.room", { code })}</div><h2>${text("join.invited")}</h2><p>${text("join.description")}</p><label for="player-name">${text("join.name")}</label><input id="player-name" maxlength="16" autocomplete="nickname" value="${escapeHtml(getName())}" required /><button class="primary" type="submit">${text("join.enter")} <span>→</span></button><a href="/" class="text-link">${text("common.back")}</a></form></main>`;
-  root.querySelector("#direct-join").addEventListener("submit", (event) => { event.preventDefault(); connectToRoom(code, saveName(), sessionStorage.getItem(`blast-host-${code}`)); });
+  root.innerHTML = `<main class="center-shell"><nav>${brand()}${settingsMenu()}</nav><form class="compact-card" id="direct-join"><div class="card-kicker">${text("common.room", { code })}</div><h2>${text("join.invited")}</h2><p>${text("join.description")}</p><label for="player-name">${text("join.name")}</label><input id="player-name" maxlength="16" autocomplete="nickname" value="${escapeHtml(getName())}" required />${rankingEmailField()}<button class="primary" type="submit">${text("join.enter")} <span>→</span></button><a href="/" class="text-link">${text("common.back")}</a></form></main>`;
+  root.querySelector("#direct-join").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = root.querySelector("#ranking-email").value;
+    const hostToken = sessionStorage.getItem(`blast-host-${code}`);
+    connectToRoom(code, saveName(), { hostToken, email });
+  });
 }
 
 /**
@@ -610,7 +607,7 @@ function renderConnecting(code) {
 function connectToRoom(
   code,
   name,
-  hostToken = null,
+  { hostToken = null, email = "" } = {},
 ) {
   clearInterval(latencyTimer);
 
@@ -645,7 +642,7 @@ function connectToRoom(
           roomCode: code,
           name,
           hostToken,
-          rankingToken: getRankingToken(),
+          email,
         }),
       );
     },

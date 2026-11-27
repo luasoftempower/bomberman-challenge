@@ -71,6 +71,17 @@ export function createRoomButtonContent() {
   `;
 }
 
+export function rankingEmailField() {
+  return `
+    <div class="ranking-email">
+      <label for="ranking-email">${text("ranking.email")}</label>
+      <input id="ranking-email" type="email" maxlength="254" autocomplete="email"
+        aria-describedby="ranking-email-help" />
+      <small id="ranking-email-help">${text("ranking.emailHelp")}</small>
+    </div>
+  `;
+}
+
 // Os IDs ligam o HTML aos eventos registrados no main.js depois da montagem.
 // Criar sala usa submit; entrar usa type="button" para não disparar essa criação.
 // O código aceita seis letras ou dígitos de 2 a 9; a validação de entrada também
@@ -78,6 +89,7 @@ export function createRoomButtonContent() {
 function roomForm() {
   return `
     <form class="arcade-menu-form" id="create-form">
+      ${rankingEmailField()}
       <button class="arcade-action create-room-action" type="submit">
         ${createRoomButtonContent()}
       </button>
@@ -168,6 +180,7 @@ function overallRanking() {
   return `
     <section class="overall-ranking" aria-labelledby="overall-ranking-title">
       <h2 id="overall-ranking-title">${text("ranking.overall")}</h2>
+      <p class="overall-ranking-description">${text("ranking.description")}</p>
       <div id="overall-ranking-entries" aria-live="polite">
         <p>${text("ranking.loading")}</p>
       </div>
